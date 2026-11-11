@@ -1,0 +1,14 @@
+{
+  "source": "Nmap / IEEE OUI",
+  "source_url": "https://github.com/nmap/nmap/blob/master/nmap-mac-prefixes",
+  "downloaded_at": "2026-10-07",
+  "source_sha256": "ae8b132bb3471ea94055e111137f76e041f4a8f5df9799ac184cc1fbf23d508d",
+  "vendors": {
+    "34F015": "Beijing Xiaomi Mobile Software",
+    "50FE39": "Beijing Xiaomi Mobile Software",
+    "5448E6": "Beijing Xiaomi Mobile Software",
+    "B06B11": "Hui Zhou Gaoshengda Technology",
+    "B88880": "Shanghai Imilab TechnologyLtd",
+    "E4FE43": "Beijing Xiaomi Mobile Software"
+  }
+}

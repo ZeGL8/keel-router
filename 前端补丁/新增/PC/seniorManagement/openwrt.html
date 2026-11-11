@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0,maximum-scale=1.0, user-scalable=no" />
+	<meta http-equiv="pragma" content="no-cache">
+	<meta http-equiv="cache-control" content="no-cache">
+	<meta http-equiv="expires" content="0">
+	<title>OpenWrt高级设置</title>
+	<link href="../../P_IMG/icon.png" rel="icon" type="image/x-icon" />
+	<link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css">
+	<link rel="stylesheet" href="../css/seniorManagement_common.css?v=20260928a">
+	<script type="text/javascript" src="../../Public_JS/jquery.min.js"></script>
+	<script type="text/javascript" src="../../Public_JS/jquery.cookie.js"></script>
+	<script type="text/javascript" src="../../Public_JS/iframe_height.js"></script>
+	<style>
+		.ow_intro { color: #666; font-size: 14px; line-height: 24px; margin: 24px 0 20px; }
+		.ow_intro b { color: #333; font-weight: 500; }
+		.ow_grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+		.ow_card { border: 1px solid #eee; border-radius: 8px; padding: 18px 20px; background: #fafbfc; }
+		.ow_card h4 { margin: 0 0 6px; font-size: 15px; font-weight: 500; color: #333; }
+		.ow_card p { margin: 0; font-size: 13px; color: #888; line-height: 20px; }
+		.ow_warn { margin: 20px 0 0; padding: 12px 16px; border-radius: 6px; background: #fff7e8; color: #b7791f; font-size: 13px; line-height: 20px; }
+		.ow_foot { text-align: center; margin: 32px 0 10px; }
+		.ow_foot button { min-width: 240px; height: 44px; border: 0; border-radius: 4px; background: #4762FE; color: #fff; font-size: 15px; cursor: pointer; }
+		@media (max-width: 640px) { .ow_grid { grid-template-columns: 1fr; } }
+	</style>
+</head>
+<body>
+	<!-- Keel UI 是 OpenWrt 之上的易用界面；这里是 OpenWrt 原生管理界面（LuCI）的入口。
+	     点按钮把当前登录会话交给 /cgi-bin/luci-sso，由它补上 LuCI 要求的 token、
+	     种 sysauth_http cookie 后跳到 LuCI —— 不用再登录一次。 -->
+	<div class="seniorManagement_Box">
+		<div class="seniorManagement_top DMZ_top">OpenWrt高级设置</div>
+		<div class="seniorManagement_content">
+			<p class="ow_intro">本路由器运行 <b>OpenWrt</b> 系统，本界面通过 OpenWrt 的配置与服务管理路由器。
+				如需本界面未提供的高级功能，可进入 OpenWrt 原生管理界面（LuCI），无需再次登录。</p>
+			<div class="ow_grid">
+				<div class="ow_card"><h4>状态与日志</h4><p>系统日志、进程、实时流量、连接详情</p></div>
+				<div class="ow_card"><h4>软件与服务</h4><p>软件包管理、计划任务、启动项</p></div>
+				<div class="ow_card"><h4>网络与防火墙</h4><p>接口、防火墙、无线、DDNS、UPnP、WireGuard 的完整参数</p></div>
+				<div class="ow_card"><h4>备份与升级</h4><p>配置备份/恢复、固件升级</p></div>
+			</div>
+			<p class="ow_warn">IPv6 与访问控制共用原生防火墙配置；设备名称与限速可在 LuCI“服务 → 设备名称与限速”中管理。</p>
+			<div class="ow_foot"><button type="button" class="open_luci_btn">打开 OpenWrt 管理界面</button></div>
+		</div>
+	</div>
+	<script>
+		$(function () {
+			var sid = $.cookie('sessionid');
+			if (sid == null || sid === '') {
+				top.location.href = 'http://' + location.host + '/index.html';
+				return;
+			}
+			/* 先同步开新标签（仍在点击手势内，不会被拦截），再用同源 fetch 交会话给
+			   luci-sso（它种 sysauth_http cookie），完成后把新标签指向 LuCI。
+			   不用 form target=_blank 直接 POST：部分内嵌浏览器会把它降级成 GET 丢掉会话。 */
+			$('.open_luci_btn').on('click', function () {
+				var w = window.open('about:blank', '_blank');
+				var go = function () {
+					if (w && !w.closed) w.location.href = '/cgi-bin/luci/';
+					else top.location.href = '/cgi-bin/luci/';
+				};
+				fetch('/cgi-bin/luci-sso', {
+					method: 'POST',
+					credentials: 'same-origin',
+					redirect: 'manual',
+					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+					body: 'sessionid=' + encodeURIComponent($.cookie('sessionid') || '')
+				}).then(go, go);
+			});
+		});
+	</script>
+</body>
+</html>

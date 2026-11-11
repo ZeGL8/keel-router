@@ -1,0 +1,1 @@
+{"kel-policy":{"description":"OpenWrt device names and bandwidth policy","read":{"uci":["kel","firewall"]},"write":{"uci":["kel"]}}}

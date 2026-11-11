@@ -1,0 +1,29 @@
+#!/bin/sh /etc/rc.common
+# /etc/init.d/keladg —— AdGuardHome 跑在内存（/tmp），闪存只放本脚本 + 文本配置。
+# 开机：镜像下载程序到 /tmp → 校验 sha256 → 起 AdGuardHome（监听 5354，不占 53）→ 自检通过后才用 fw4 把 LAN 的 53 端口转过来。
+# 断网保护：转发规则由 guard 管理；AdGuardHome 不在/不应答 → 立刻撤规则，DNS 回到 dnsmasq，不影响上网。
+START=98
+STOP=10
+USE_PROCD=1
+RUN=/usr/share/keladg/run.sh
+
+start_service() {
+	[ "$(uci -q get keladg.main.enabled)" = "1" ] || { $RUN rules-off; return 0; }
+	procd_open_instance guard
+	procd_set_param command $RUN guard
+	procd_set_param respawn 3600 5 0
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_close_instance
+}
+
+stop_service() {
+	$RUN rules-off
+	$RUN core-stop
+}
+
+# 故意不设 reload trigger：uci commit 不应该导致 DNS 过滤重启；需要重启时由后端显式 restart。
+reload_service() {
+	stop
+	start
+}

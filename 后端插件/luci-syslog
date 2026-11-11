@@ -1,0 +1,75 @@
+#!/usr/bin/ucode
+/* Keel UI「下载日志」端点（真实现，2026-09-23）。
+ *
+ * 背景：前端 system.html 的「下载日志」按钮以隐藏表单 POST 到
+ *     /cgi-bin/luci-syslog（字段：sessionid），期望浏览器弹出附件下载。
+ *     原厂包里这个 CGI 不存在 → 按钮点了必失败（假功能）。
+ *
+ * 实现：校验 rpcd 会话后，把 logread（系统日志，含内核环形缓冲）
+ *     以 text/plain 附件形式返回。只读操作，不碰任何配置。
+ *
+ * 注意：
+ *   - 会话必须有效（ubus call session list 比对），防止任意人拉日志；
+ *   - 表单是 application/x-www-form-urlencoded，sessionid 是 32 位
+ *     十六进制串，不做复杂 URL 解码，直接取 sessionid= 之后的 token；
+ *   - 响应必须带 Content-Disposition: attachment，否则日志会被
+ *     塞进隐藏 iframe 里而不是触发下载。
+ */
+'use strict';
+
+import { popen } from 'fs';
+
+function fail() {
+	print('Status: 403 Forbidden\r\n');
+	print('Content-Type: text/plain\r\n\r\n');
+	print('invalid session\n');
+	exit(0);
+}
+
+let len = int(getenv('CONTENT_LENGTH') ?? '0');
+if (len <= 0 || len > 4096) fail();
+
+let f = popen('cat /dev/stdin 2>/dev/null', 'r');
+if (f == null) fail();
+let body = (f.read('all') ?? '');
+f.close();
+
+/* 提取 sessionid=<token>（表单字段唯一，直接按名字截取） */
+let p = index(body, 'sessionid=');
+if (p < 0) fail();
+let rest = substr(body, p + length('sessionid='));
+let amp = index(rest, '&');
+let sid = (amp > 0) ? substr(rest, 0, amp) : rest;
+sid = trim(replace(sid, /[^0-9a-zA-Z]/g, ''));
+if (length(sid) < 8 || length(sid) > 64) fail();
+
+/* 会话校验：grep 计数法与 luci-upload 一致 */
+let chk = popen('ubus call session list 2>/dev/null | grep -c ' + sid + '; echo', 'r');
+let ok = (chk != null) ? trim('' + chk.read('all')) : '0';
+if (chk != null) chk.close();
+if (ok == '0') fail();
+
+/* 文件名带时间戳 */
+let d = popen("date +%Y%m%d-%H%M%S 2>/dev/null", 'r');
+let ts = (d != null) ? trim('' + d.read('all')) : '';
+if (d != null) d.close();
+if (length(ts) != 15) ts = 'log';
+
+print('Content-Type: text/plain; charset=utf-8\r\n');
+print('Content-Disposition: attachment; filename="keel-syslog-' + ts + '.txt"\r\n');
+print('\r\n');
+
+/* 系统日志（logread 已含内核消息）+ 内核环形缓冲，分区标注 */
+print('==== system log (logread) ====\n');
+let lg = popen('logread 2>/dev/null', 'r');
+if (lg != null) {
+	print('' + lg.read('all'));
+	lg.close();
+}
+print('\n==== kernel ring buffer (dmesg) ====\n');
+let dm = popen('dmesg 2>/dev/null', 'r');
+if (dm != null) {
+	print('' + dm.read('all'));
+	dm.close();
+}
+exit(0);

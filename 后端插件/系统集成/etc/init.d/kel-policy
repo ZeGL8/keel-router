@@ -1,0 +1,21 @@
+#!/bin/sh /etc/rc.common
+# OpenWrt device-policy extension: UCI -> fw4 includes -> firewall service.
+START=18
+USE_PROCD=1
+service_triggers() {
+ procd_add_reload_trigger kel firewall network
+}
+prepare_policy() {
+ mkdir -p /usr/share/nftables.d/table-post /usr/share/nftables.d/chain-pre/forward /usr/share/nftables.d/chain-pre/input
+ test -e /etc/kel-empty-macset || : > /etc/kel-empty-macset
+ ucode /usr/share/kel/policy.uc
+}
+boot() {
+ start
+}
+start_service() {
+ prepare_policy
+}
+reload_service() {
+ prepare_policy && fw4 check && /etc/init.d/firewall reload && fw4 reload-sets
+}

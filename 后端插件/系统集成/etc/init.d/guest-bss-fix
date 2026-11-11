@@ -1,0 +1,25 @@
+#!/bin/sh /etc/rc.common
+# 访客 BSS 僵尸看门狗：中继(STA+AP 同射频)开机启动时，guest_radio0 可能因
+# apsta_state 时序竞态不 beacon（netdev NO-CARRIER，SSID 搜不到，见 kelapi
+# wifiReload 注释）。开机后检测 2 分钟，发现该起未起就弹跳一次 wwan 修复。
+START=99
+boot() {
+	(
+	sleep 40
+	[ "$(uci -q get wireless.wwan.disabled)" = "1" ] && exit 0
+	[ "$(uci -q get wireless.guest_radio0.disabled)" = "1" ] && exit 0
+	uci -q get wireless.guest_radio0 >/dev/null 2>&1 || exit 0
+	i=0
+	while [ $i -lt 6 ]; do
+		if ! ip link show phy0-ap1 2>/dev/null | grep -q LOWER_UP; then
+			logger -t guest-bss-fix "phy0-ap1 no carrier, bouncing wwan"
+			ifdown wwan
+			sleep 2
+			ifup wwan
+			exit 0
+		fi
+		sleep 20
+		i=$((i+1))
+	done
+	) &
+}

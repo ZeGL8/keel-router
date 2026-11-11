@@ -1,0 +1,11 @@
+# /lib/upgrade/keep.d/kel —— 升级时要随配置一起保留的**数据**（不是代码；代码在固件里）。
+# /etc/config/* 由系统默认保留，不用列。
+/etc/kelclash
+/etc/keladg
+/etc/kel_devices
+/etc/kel_hosts
+/etc/kel_alive
+/etc/kel_boot.log
+/etc/kel_lastlog
+/etc/kel-empty-macset
+/etc/kel_upgrade.log

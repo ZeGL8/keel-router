@@ -1,0 +1,1 @@
+{"admin/services/kel-policy":{"title":"设备名称与限速","order":55,"action":{"type":"view","path":"kel/devices"},"depends":{"acl":["kel-policy"]}}}

@@ -1,0 +1,6 @@
+#!/bin/sh
+# /etc/hotplug.d/ntp/30-kel-time —— ntpd 校时成功就打个标记，kelclash/keladg 开机时据此等「时间校准」（lib.sh wait_net）。
+# 没有这个标记的话，开机早期写的事件时间戳是「上次关机时间」，页面上会显示几天前。
+case "$ACTION" in
+	step|stratum) touch /tmp/kel-timesync ;;
+esac

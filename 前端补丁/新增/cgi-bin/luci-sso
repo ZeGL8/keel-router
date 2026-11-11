@@ -1,0 +1,55 @@
+#!/usr/bin/ucode
+/* Keel UI →「OpenWrt 高级设置」(LuCI) 免二次登录入口（2026-09-27）
+ *
+ * Keel UI 与 LuCI 用的是同一个 rpcd 会话体系（ubus session.login root）。
+ * LuCI 认会话有两个条件（/usr/share/ucode/luci/dispatcher.uc session_retrieve）：
+ *   ① cookie sysauth_http（HTTPS 下 sysauth_https）= ubus_rpc_session
+ *   ② 该会话 values.token 是字符串（LuCI 自己登录时写入的 CSRF 令牌）
+ * 浏览器里的会话没有 session.set 权限（rpcd ACL 不给），rpcd 插件里调
+ * session 又会死锁 —— 所以放在独立 CGI 进程里做：
+ *   POST sessionid → 校验是 root 的有效会话 → 补 token → 种 cookie → 302 到 LuCI。
+ * 会话无效就直接 302 到 LuCI 登录页（不泄露任何信息）。
+ */
+'use strict';
+
+import { popen } from 'fs';
+
+function sh(cmd) {
+	let p = popen(cmd + ' 2>/dev/null', 'r');
+	if (p == null) return '';
+	let s = p.read('all') ?? '';
+	p.close();
+	return '' + s;
+}
+
+function go(loc, cookie) {
+	print('Status: 302 Found\r\n');
+	if (cookie) print('Set-Cookie: ' + cookie + '\r\n');
+	print('Location: ' + loc + '\r\n');
+	print('Cache-Control: no-store\r\n\r\n');
+	exit(0);
+}
+
+let body = '';
+let len = int(getenv('CONTENT_LENGTH') ?? '0');
+if (len > 0 && len <= 4096) {
+	let f = popen('head -c ' + len + ' /dev/stdin', 'r');
+	if (f != null) { body = '' + (f.read('all') ?? ''); f.close(); }
+}
+let m = match(body, /sessionid=([0-9a-fA-F]{32})/);
+if (m == null) go('/cgi-bin/luci/');
+let sid = lc(m[1]);
+
+/* 只放行 root 的有效会话 */
+let sd = null;
+try { sd = json(sh("ubus call session get '{\"ubus_rpc_session\":\"" + sid + "\"}'")); } catch (e) { sd = null; }
+if (sd == null || sd.values == null || sd.values.username !== 'root') go('/cgi-bin/luci/');
+
+if (type(sd.values.token) !== 'string') {
+	let tok = trim(sh('head -c 16 /dev/urandom | hexdump -e \'16/1 "%02x"\''));
+	if (length(tok) !== 32) go('/cgi-bin/luci/');
+	sh("ubus call session set '{\"ubus_rpc_session\":\"" + sid + "\",\"values\":{\"token\":\"" + tok + "\"}}'");
+}
+
+let name = (getenv('HTTPS') == 'on') ? 'sysauth_https' : 'sysauth_http';
+go('/cgi-bin/luci/', name + '=' + sid + '; path=/cgi-bin/luci; HttpOnly; SameSite=Strict');

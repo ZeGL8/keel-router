@@ -1,0 +1,3 @@
+# 构建环境只需要 ImageBuilder 压缩包；别把备份和产物发给 docker
+*
+!下载/openwrt-imagebuilder-25.12.5-ramips-mt7621.Linux-x86_64.tar.zst

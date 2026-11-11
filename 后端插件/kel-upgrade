@@ -1,0 +1,154 @@
+#!/bin/sh
+# kel-upgrade —— 在线升级（路由器端，全程自己完成，不依赖任何外部连接保持在线）。
+#
+#   kel-upgrade check  [URL]            取版本清单，和当前版本比较，输出 JSON
+#   kel-upgrade start  [URL] [选项]     后台跑完整流程：检查 → 下载 → 校验 → 停引擎 → 刷入 → 重启；立刻返回
+#   kel-upgrade status                  当前进度（JSON）
+#   kel-upgrade inspect <文件>          检查一个已经在路由器上的固件文件（界面「上传固件」用），输出 JSON
+#   kel-upgrade start --file <文件> [--ver 版本]   用这个文件升级（跳过下载；其余步骤相同）
+#   选项：--dry 做到「只校验不刷写」为止（演练）；--same 允许刷同一版本（重刷/首次迁移）
+#
+# URL 是放固件的目录地址，下面要有 latest.json 和固件文件；不传就用 uci kel.settings.upgrade_url。
+# 设计要点：
+# · 固件下载到内存盘 /tmp，刷写时不再需要网络；
+# · 任何一步不对就停在刷写之前，路由器保持原样继续工作（引擎只在最后一步才停）；
+# · 只调用系统自带的 sysupgrade（保留配置），它只写 firmware 分区，不碰引导程序和无线校准数据；
+# · 状态写 /tmp/kel-upgrade/state（重启后自然消失）；升级历史写 /etc/kel_upgrade.log（随配置保留，新系统启动后续写一行）。
+D=/tmp/kel-upgrade
+LOGF=/etc/kel_upgrade.log
+MAXSZ=16187392		# firmware 分区大小
+
+cur_ver() { sed -n 's/^version=//p' /etc/kel_version 2>/dev/null; }
+board() { ubus call system board 2>/dev/null | jsonfilter -e '@.board_name'; }
+js() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+st() {	# st <phase> <百分比> <说明>
+	mkdir -p $D
+	printf '{"phase":"%s","pct":%s,"msg":"%s","current":"%s","target":"%s","time":%s}\n' "$1" "${2:-0}" "$(js "$3")" "$(cur_ver)" "$(js "$TVER")" "$(date +%s)" > $D/state.tmp && mv $D/state.tmp $D/state
+	logger -t kel-upgrade "$1: $3"
+}
+die() { st error 0 "$1"; rm -rf $D/lock; exit 1; }
+# 版本比较：a > b 返回 0（按点分数字逐段比）
+ver_gt() {
+	[ "$1" = "$2" ] && return 1
+	first=$(printf '%s\n%s\n' "$1" "$2" | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | tail -n 1)
+	[ "$first" = "$1" ]
+}
+base_url() { u=${1:-$(uci -q get kel.settings.upgrade_url)}; echo "${u%/}"; }
+
+fetch_manifest() {	# 结果放进 TVER TFILE TSIZE TSHA TBOARD TNOTES
+	U=$(base_url "$1"); [ -n "$U" ] || { ERR="没有设置升级地址"; return 1; }
+	mkdir -p $D
+	curl -sfL -m 20 --retry 2 -o $D/latest.json "$U/latest.json" 2>/dev/null || { ERR="取不到版本清单（$U/latest.json）"; return 1; }
+	TVER=$(jsonfilter -i $D/latest.json -e '@.version' 2>/dev/null); TFILE=$(jsonfilter -i $D/latest.json -e '@.file' 2>/dev/null)
+	TSIZE=$(jsonfilter -i $D/latest.json -e '@.size' 2>/dev/null); TSHA=$(jsonfilter -i $D/latest.json -e '@.sha256' 2>/dev/null)
+	TBOARD=$(jsonfilter -i $D/latest.json -e '@.board' 2>/dev/null); TNOTES=$(jsonfilter -i $D/latest.json -e '@.notes' 2>/dev/null)
+	case "$TVER" in ''|*[!0-9.]*) ERR="版本清单里的版本号不对"; return 1;; esac
+	case "$TFILE" in ''|*/*|*..*) ERR="版本清单里的文件名不对"; return 1;; esac
+	case "$TSIZE" in ''|*[!0-9]*) ERR="版本清单里的大小不对"; return 1;; esac
+	[ ${#TSHA} = 64 ] || { ERR="版本清单里的校验和不对"; return 1; }
+	return 0
+}
+
+do_check() {
+	if ! fetch_manifest "$1"; then printf '{"status":1,"error":"%s","current":"%s"}\n' "$(js "$ERR")" "$(cur_ver)"; return 1; fi
+	newer=0; ver_gt "$TVER" "$(cur_ver)" && newer=1
+	okb=0; [ "$TBOARD" = "$(board)" ] && okb=1
+	printf '{"status":0,"current":"%s","latest":"%s","newer":%s,"board_ok":%s,"size":%s,"notes":"%s"}\n' "$(cur_ver)" "$TVER" $newer $okb "$TSIZE" "$(js "$TNOTES")"
+}
+
+# 本机型固件？用系统自己的检查（看固件末尾的机型标记），不刷写
+inspect() {
+	f=$1
+	[ -f "$f" ] || { echo '{"status":1,"error":"文件不存在"}'; return 1; }
+	sz=$(wc -c < "$f")
+	if [ "$sz" -lt 1000000 ] || [ "$sz" -gt $MAXSZ ]; then printf '{"status":2,"error":"大小不对（%s 字节），不像是本机的固件","size":%s}\n' "$sz" "$sz"; return 1; fi
+	if ! sysupgrade -T "$f" >/tmp/kel-inspect.log 2>&1; then printf '{"status":3,"error":"%s","size":%s}\n' "$(js "系统拒绝了这个文件：$(tail -n 1 /tmp/kel-inspect.log | cut -c1-100)")" "$sz"; rm -f /tmp/kel-inspect.log; return 1; fi
+	rm -f /tmp/kel-inspect.log
+	printf '{"status":0,"size":%s,"sha256":"%s","current":"%s"}\n' "$sz" "$(sha256sum "$f" | cut -d' ' -f1)" "$(cur_ver)"
+}
+
+run() {	# run <URL 或 file:路径> <dry 0/1> <same 0/1> [版本]   —— 完整流程，在后台执行
+	URL=$1; DRY=$2; SAME=$3
+	mkdir -p $D
+	mkdir $D/lock 2>/dev/null || { echo "已经有一个升级在进行"; exit 1; }
+	case "$URL" in file:*)
+		# 用户在界面上传的固件：文件已经在内存盘里，没有版本清单可比，只做「是不是本机型的固件」这一关
+		F=${URL#file:}; TVER=$4
+		st verifying 60 "正在校验上传的固件"
+		[ -f "$F" ] || die "找不到上传的固件文件"
+		TSIZE=$(wc -c < "$F"); TSHA=$(sha256sum "$F" | cut -d' ' -f1)
+		[ "$TSIZE" -gt 1000000 ] && [ "$TSIZE" -le $MAXSZ ] || die "固件大小不合理（$TSIZE 字节）"
+		sysupgrade -T "$F" >$D/test.log 2>&1 || die "系统拒绝了这个固件：$(tail -n 1 $D/test.log | cut -c1-100)"
+		finish_flash; return ;;
+	esac
+	st checking 2 "正在检查新版本"
+	fetch_manifest "$URL" || die "$ERR"
+	[ "$TBOARD" = "$(board)" ] || die "这个固件不是给本机型的（固件：$TBOARD，本机：$(board)）"
+	if ! ver_gt "$TVER" "$(cur_ver)"; then [ "$SAME" = 1 ] && [ "$TVER" = "$(cur_ver)" -o -z "$(cur_ver)" ] || die "已经是最新版本（当前 $(cur_ver)，服务器上 $TVER）"; fi
+	[ "$TSIZE" -gt 1000000 ] && [ "$TSIZE" -le $MAXSZ ] || die "固件大小不合理（$TSIZE 字节）"
+	avail=$(awk '/MemAvailable/{print $2}' /proc/meminfo)
+	[ "${avail:-0}" -gt $(( TSIZE / 1024 + 20000 )) ] || die "内存不够下载固件（可用 ${avail}KB）"
+
+	st downloading 5 "正在下载固件 $TVER"
+	F=$D/fw.bin; rm -f $F
+	( curl -sfL -m 900 --retry 3 --retry-delay 3 -C - -o $F "$(base_url "$URL")/$TFILE" 2>/dev/null; echo $? > $D/dl.rc ) &
+	while [ ! -f $D/dl.rc ]; do
+		sleep 2; got=$(wc -c 2>/dev/null < $F); st downloading $(( 5 + ${got:-0} * 60 / TSIZE )) "正在下载固件 $TVER（$(( ${got:-0} / 1024 )) / $(( TSIZE / 1024 )) KB）"
+	done
+	[ "$(cat $D/dl.rc)" = 0 ] || die "固件下载失败"
+	rm -f $D/dl.rc
+
+	st verifying 70 "正在校验固件"
+	[ "$(wc -c < $F)" = "$TSIZE" ] || die "下载的固件大小不对"
+	[ "$(sha256sum $F | cut -d' ' -f1)" = "$TSHA" ] || die "固件校验和不一致，文件可能损坏或被替换"
+	sysupgrade -T $F >$D/test.log 2>&1 || die "系统拒绝了这个固件：$(tail -n 1 $D/test.log | cut -c1-100)"
+
+	finish_flash
+}
+
+# 校验通过之后的公共部分：清理保留清单 → 备份自检 → 停引擎 → 刷写（F=固件文件，TVER/TSHA 已就绪）
+finish_flash() {
+	# 升级保留清单里不能有代码：代码在新固件里，带过去会盖住新文件
+	if [ -f /etc/sysupgrade.conf ] && grep -q -E '^/(www|usr/share/kel|usr/share/kelclash|usr/share/keladg|usr/sbin/kel-|usr/share/rpcd/|usr/share/nftables\.d/|usr/share/luci/menu\.d/kel|etc/init\.d/|etc/hotplug\.d/)' /etc/sysupgrade.conf; then
+		grep -v -E '^/(www|usr/share/kel|usr/share/kelclash|usr/share/keladg|usr/sbin/kel-|usr/share/rpcd/|usr/share/nftables\.d/|usr/share/luci/menu\.d/kel|etc/init\.d/|etc/hotplug\.d/)' /etc/sysupgrade.conf > $D/sc.new
+		if [ "$DRY" = 1 ]; then n=$(grep -c . $D/sc.new); else cat $D/sc.new > /etc/sysupgrade.conf; fi
+	fi
+	grep -qx "$LOGF" /etc/sysupgrade.conf 2>/dev/null || [ "$DRY" = 1 ] || echo "$LOGF" >> /etc/sysupgrade.conf
+	if [ "$DRY" != 1 ]; then
+		bad=$(sysupgrade -l 2>/dev/null | grep -c -E '^/(www/|usr/share/kel|usr/sbin/kel-|usr/share/rpcd/)')
+		[ "$bad" = 0 ] || die "配置备份清单里还有 $bad 个程序文件，为安全起见不继续"
+	fi
+	bsz=$(sysupgrade -b - 2>/dev/null | wc -c)
+	[ "${bsz:-0}" -gt 1000 ] || die "配置备份生成失败"
+
+	if [ "$DRY" = 1 ]; then st dry-ok 100 "演练通过：固件 $TVER 已校验，未刷写（配置备份 $(( bsz / 1024 )) KB）"; case "$F" in $D/*) rm -f $F;; esac; rm -rf $D/lock; exit 0; fi
+
+	st stopping 80 "正在停止代理和广告过滤，准备刷写"
+	echo "$(date '+%Y-%m-%d %H:%M:%S') start from=$(cur_ver) to=$TVER sha=$TSHA" >> $LOGF
+	/etc/init.d/kelclash stop >/dev/null 2>&1; /etc/init.d/keladg stop >/dev/null 2>&1
+	sleep 2; rm -rf /tmp/kelclash /tmp/keladg /var/run/kelclash /var/run/keladg	# 两个内核共约 100MB，都在内存盘里
+	sync
+	st flashing 90 "正在刷写固件并重启，约需 3–5 分钟，请不要断电"
+	sleep 2		# 让状态有机会被读到
+	# sysupgrade 会结束所有进程、切到内存里的最小系统再写闪存；从这里起本脚本不再返回
+	exec sysupgrade -v $F
+}
+
+case "$1" in
+	check) do_check "$2" ;;
+	status) [ -f $D/state ] && cat $D/state || printf '{"phase":"idle","pct":0,"msg":"","current":"%s","target":"","time":%s}\n' "$(cur_ver)" "$(date +%s)" ;;
+	start)
+		shift; URL=""; DRY=0; SAME=0; VERA=""; nx=""
+		for a in "$@"; do
+			case "$nx" in file) URL="file:$a"; nx=""; continue;; ver) VERA=$a; nx=""; continue;; esac
+			case "$a" in --dry) DRY=1;; --same) SAME=1;; --file) nx=file;; --ver) nx=ver;; *) URL=$a;; esac
+		done
+		case "$VERA" in *[!0-9.]*) VERA="";; esac
+		[ -d $D/lock ] && { echo '{"status":2,"error":"已经有一个升级在进行"}'; exit 1; }
+		rm -f $D/state
+		setsid "$0" _run "$URL" $DRY $SAME "$VERA" >/dev/null 2>&1 < /dev/null &
+		echo '{"status":0}' ;;
+	_run) run "$2" "$3" "$4" "$5" ;;
+	inspect) inspect "$2" ;;
+	*) echo "usage: $0 check|start|status|inspect [URL | --file 文件] [--dry] [--same]"; exit 1 ;;
+esac

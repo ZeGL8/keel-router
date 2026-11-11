@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0,maximum-scale=1.0, user-scalable=no" />
+	<meta http-equiv="pragma" content="no-cache">
+	<meta http-equiv="cache-control" content="no-cache">
+	<meta http-equiv="expires" content="0">
+	<title>代理加速</title>
+	<link href="../../P_IMG/icon.png" rel="icon" type="image/x-icon" />
+	<link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css">
+	<link rel="stylesheet" href="../css/seniorManagement_common.css?v=20260928a">
+	<script type="text/javascript" src="../../Public_JS/jquery.min.js"></script>
+	<script type="text/javascript" src="../../Public_JS/jquery.cookie.js"></script>
+	<script type="text/javascript" src="../../Public_JS/iframe_height.js"></script>
+	<script type="text/javascript" src="../../Public_JS/kel-ui.js?v=20261006a"></script>
+	<link rel="stylesheet" href="../css/kel-app.css?v=20261006a">
+<style>
+.st-bars { display: flex; align-items: flex-end; gap: 3px; height: 90px; margin-top: 18px; border-bottom: 1px solid #e6e8ef; }
+.st-bars i { flex: 1; min-width: 4px; background: #4762FE; border-radius: 2px 2px 0 0; opacity: .85; }
+.st-bars i.z { background: #e6e8ef; height: 2px !important; opacity: 1; }
+.st-bars i.t { background: #22b573; }
+.st-axis { display: flex; justify-content: space-between; font-size: 12px; color: #999; margin-top: 6px; }
+.st-pct { height: 8px; background: #eef0f6; border-radius: 4px; overflow: hidden; }
+.st-pct b { display: block; height: 100%; background: #4762FE; border-radius: 4px; }
+</style></head>
+<body>
+	<div class="seniorManagement_Box">
+		<div class="seniorManagement_content cx" style="margin:0">
+			<div class="cx-head">
+				<div><h2>代理加速</h2><p class="sub">让家里的设备通过代理节点访问境外网站</p></div>
+				<div style="display:flex;align-items:center;gap:12px"><span class="cx-btn sm" id="cx_diag">🔍 一键自检</span></div>
+			</div>
+			<div class="cx-back" id="cx_back" style="display:none"><span id="cx_back_b" title="返回"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></span><div><b id="cx_back_t"></b><p id="cx_back_d"></p></div></div>
+			<div class="cx-bar" id="cx_subbar" style="display:none;margin-top:-6px"><div class="cx-seg" id="cx_sub"><span data-t="conns">连接</span><span data-t="logs">日志</span><span data-t="traffic">流量与状态</span><span data-t="rules">规则与代理地址</span></div></div>
+
+			<!-- ① 概览 -->
+			<div class="cx-pane on" id="p_overview">
+				<div class="cx-alert" id="cx_alert"></div>
+				<!-- 首页只放「现在是什么状态」和最常用的几个入口；其余设置各自进二级页（见 goTab），不平铺 -->
+				<div class="hm-hero" id="hm_hero">
+					<span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.4-2.9 8.2-7 9.5-4.1-1.3-7-5.1-7-9.5V6l7-3z"/><path d="M9 12l2.2 2.2L15.2 10"/></svg></span>
+					<div class="hm-st"><div class="t" id="hm_t">—</div><div class="d" id="hm_d"></div><div class="bar" id="hero_bar" style="display:none"><b style="width:0"></b></div></div>
+					<div class="sw"><span class="hm-sw" id="hm_sw" title="开启 / 关闭代理加速"><i></i></span><em id="hm_sw_t"></em></div>
+				</div>
+				<div class="hm-grid" id="hm_rows">
+					<div class="hm-tile go" data-go="nodes"><span class="ic c1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.8 3.9 5.8 3.9 9s-1.3 6.2-3.9 9c-2.6-2.8-3.9-5.8-3.9-9S9.400 5.800 12 3z"/></svg></span><div class="bd"><div class="k">当前节点</div><div class="v" id="hm_node">—</div><div class="s" id="hm_node_s"></div></div><span class="ar"></span></div>
+					<div class="hm-tile"><span class="ic c2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h5c3 0 3 6 6 6h5M4 18h5c3 0 3-6 6-6"/><path d="M17 9l3 3-3 3"/></svg></span><div class="bd"><div class="k">分流方式</div><div class="cx-seg" id="cx_mode"><span data-m="rule">智能分流</span><span data-m="global">全部代理</span><span data-m="direct">全部直连</span></div><div class="s" id="cx_modehint"></div></div></div>
+					<div class="hm-tile go" data-go="scope"><span class="ic c3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="13" height="9" rx="1.5"/><path d="M2 17h15"/><rect x="17" y="9" width="4.500" height="10" rx="1.200"/></svg></span><div class="bd"><div class="k">接管设备</div><div class="v" id="hm_scope">—</div><div class="s"><a id="hm_restore" style="display:none">恢复直连</a></div></div><span class="ar"></span></div>
+					<div class="hm-tile go" data-go="svc"><span class="ic c4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 12h3M11 12h9M4 17h12M20 17h0"/><circle cx="16" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="18" cy="17" r="2"/></svg></span><div class="bd"><div class="k">按服务选节点</div><div class="v" id="hm_svc">—</div></div><span class="ar"></span></div>
+					<div class="hm-tile go" data-go="sub"><span class="ic c5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 005.700 0l3-3a4 4 0 00-5.700-5.700l-1 1"/><path d="M14 10a4 4 0 00-5.700 0l-3 3a4 4 0 005.700 5.700l1-1"/></svg></span><div class="bd"><div class="k">订阅</div><div class="v" id="hm_sub">—</div><div class="s" id="hm_sub_s"></div></div><span class="ar"></span></div>
+					<div class="hm-tile go" data-go="set"><span class="ic c6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.500M12 18.500V21M3 12h2.500M18.500 12H21M5.600 5.600l1.800 1.800M16.600 16.600l1.800 1.800M5.600 18.400l1.800-1.800M16.600 7.400l1.800-1.800"/></svg></span><div class="bd"><div class="k">更多设置</div><div class="v">IPv6 · 自动切换 · 日志 · 规则</div></div><span class="ar"></span></div>
+				</div>
+			</div>
+
+			<!-- 二级页：按服务选节点 / 订阅 / 更多 -->
+			<div class="cx-pane" id="p_svc">
+				<div class="cx-card">
+										<div class="cx-help" id="svc_note" style="display:none;color:var(--warn)">当前分流方式不是「智能分流」，下面的设置已保存但暂不生效；切回「智能分流」后自动生效。</div>
+					<div id="svc_rows"></div>
+					<div class="cx-help">跟随全局：沿用「代理」组当前的节点。所选地区/节点全部不可用时会自动退回「代理」组，不会断网。</div>
+					<div class="cx-actions"><span class="cx-btn pri wide dis" id="svc_save">保存</span><span id="svc_dirty" class="cx-help" style="display:none;margin:0;color:var(--warn)">有未保存的修改</span></div>
+				</div>
+			</div>
+			<div class="cx-pane" id="p_sub">
+				<div class="cx-card">
+					<h3>订阅链接<small id="sub_meta"></small><small id="f_url_dirty" style="display:none;color:var(--warn)">● 有未保存的修改</small></h3>
+					<div class="cx-field"><input type="text" id="f_url" placeholder="https://… 机场提供的 Clash / mihomo 订阅链接" autocomplete="off">
+						<div class="cx-help">支持 Clash / Clash.Meta 订阅，以及 ss、vmess、vless、trojan 链接列表订阅。更换订阅会重启内核（约 10 秒）。</div></div>
+					<div class="cx-field" style="margin-top:14px"><div style="font-weight:500;margin-bottom:6px">客户端标识<small id="f_ua_dirty" style="display:none;color:var(--warn);margin-left:8px;font-weight:400">● 有未保存的修改</small></div>
+						<select id="f_ua_sel" class="svc-node" style="height:40px;min-width:360px"></select>
+						<input type="text" id="f_ua" maxlength="100" autocomplete="off" spellcheck="false" placeholder="例如 FlClash/v0.8.92 clash-verge Platform/macos" style="display:none;margin-top:8px">
+						<div class="cx-help">拉订阅时告诉机场「我是什么客户端」，一般保持默认。有的机场只给它认可的客户端发节点——检查时提示「机场返回的是公告而不是节点」，就换成你能正常使用的那个客户端再试。
+							选好后可以先点「只检查」。列表里的版本号过旧也可能被机场拒绝，这时选「自定义」，照着你电脑上那个客户端的版本填。修改后会重新拉取订阅并重启内核。</div></div>
+					<div class="cx-actions"><span class="cx-btn pri" id="f_url_save">检查并保存</span><span class="cx-btn" id="f_url_check">只检查</span><span id="f_url_res" class="cx-help" style="margin:0"></span></div>
+				</div>
+			</div>
+			<div class="cx-pane" id="p_set">
+				<div class="cx-card">
+					<h3>IPv6 流量</h3>
+					<div class="cx-row6"><div class="cx-seg" id="f_v6"><span data-v="proxy">接管</span><span data-v="direct">直连</span></div><span class="cx-help" style="margin:0" id="v6_hint"></span></div>
+				</div>
+				<div class="cx-card">
+					<h3>QUIC（HTTP/3）<small>UDP 443</small></h3>
+					<div class="cx-row6"><div class="cx-seg" id="f_quic"><span data-v="block">拦截（推荐）</span><span data-v="allow">放行</span></div><span class="cx-help" style="margin:0" id="quic_hint"></span></div>
+				</div>
+				<div class="cx-card">
+					<h3>自动切换节点<small>当前选中的节点失效时</small></h3>
+					<div class="cx-seg" id="f_asw"><span data-v="1">开启（推荐）</span><span data-v="0">关闭</span></div>
+					<div class="cx-help">当前节点连续约 2 分钟不通、且确实有其他节点可用时，自动换到延迟最低的节点，并记到「最近事件」。为避免来回跳，换一次后至少等 10 分钟，每小时最多 3 次。</div>
+				</div>
+				<div class="cx-card">
+					<h3>最近事件<small>守护进程的自动动作记录：透明代理启停、节点切换、内核重启等</small></h3>
+					<div class="cx-ev" id="ev_list"><div style="color:var(--mute)">暂无事件</div></div>
+				</div>
+				<div class="cx-card">
+					<h3>高级</h3>
+					<div class="hm-rows">
+						<div class="hm-row go" data-go="conns"><span class="k">连接</span><span class="v mute">当前经过内核的连接，可按设备/域名查看、断开</span><span class="a">查看</span></div>
+						<div class="hm-row go" data-go="logs"><span class="k">日志</span><span class="v mute">内核运行日志</span><span class="a">查看</span></div>
+						<div class="hm-row go" data-go="traffic"><span class="k">流量与状态</span><span class="v mute">实时速度、节点数、已用流量</span><span class="a">查看</span></div>
+						<div class="hm-row go" data-go="rules"><span class="k">规则与代理地址</span><span class="v mute">自定义规则、规则集订阅、手动代理端口</span><span class="a">查看</span></div>
+					</div>
+				</div>
+			</div>
+
+			<!-- ② 节点 -->
+			<div class="cx-pane" id="p_nodes">
+				<div class="cx-bar">
+					<div style="display:flex;gap:10px;align-items:center"><span id="n_last" style="color:var(--mute);font-size:12px"></span><span class="cx-btn sm pri" id="n_test">测速全部节点</span><span class="cx-btn sm" id="n_best">切到最快节点</span><span class="cx-btn sm" id="n_update">更新订阅</span></div>
+				</div>
+								<div class="cx-legend2"><span><i class="g"></i>快 &lt; 150ms</span><span><i class="o"></i>一般 &lt; 300ms</span><span><i class="r"></i>慢</span><span><i class="x"></i>超时 / 未测速</span>
+					<span class="sortbox">排序<span class="cx-seg" id="n_sort"><span data-k="lat" class="on">按延迟</span><span data-k="sub">订阅顺序</span></span></span></div>
+				<div id="cx_nodes"></div>
+			</div>
+
+<!-- ③ 连接 -->
+			<div class="cx-pane" id="p_conns">
+				<div class="cx-bar">
+					<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+						<input class="cx-search" id="c_q" placeholder="搜索 域名 / 设备 / 规则 / 节点" autocomplete="off">
+						<div class="cx-seg" id="c_sort"><span data-k="flow" class="on">按流量</span><span data-k="new">最新</span></div>
+					</div>
+					<div style="display:flex;gap:10px;align-items:center"><span id="c_sum" style="color:var(--mute);font-size:13px"></span><span class="cx-btn sm danger" id="c_closeall">断开全部</span></div>
+				</div>
+				<div class="cx-wrap"><table class="cx-table"><thead><tr><th>目标</th><th>来源设备</th><th>规则</th><th>出口节点</th><th>流量</th><th>时长</th><th></th></tr></thead><tbody id="c_body"></tbody></table></div>
+			</div>
+
+			<!-- ④ 日志 -->
+			<div class="cx-pane" id="p_logs">
+				<div class="cx-bar">
+					<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+						<div class="cx-seg" id="l_lv"><span data-v="all" class="on">全部</span><span data-v="info">信息</span><span data-v="warning">警告</span><span data-v="error">错误</span></div>
+						<input class="cx-search" id="l_q" placeholder="搜索日志" autocomplete="off">
+					</div>
+					<div style="display:flex;gap:10px"><span class="cx-btn sm" id="l_pause">暂停滚动</span><span class="cx-btn sm" id="l_clear">清屏</span></div>
+				</div>
+				<div class="cx-log" id="l_box"></div>
+			</div>
+
+			<!-- ⑤ 高级：流量与状态 / 规则与代理地址 -->
+			<div class="cx-pane" id="p_traffic">
+
+				<div class="cx-card cx-live-card" style="margin-top:16px">
+					<h3>实时流量<small id="lv_hint">内核运行后显示</small></h3>
+					<div class="cx-live">
+						<div class="cx-speed">
+							<div class="k">↑ 上传速度</div><div class="v up" id="lv_up">—</div>
+							<div class="k">↓ 下载速度</div><div class="v dn" id="lv_dn">—</div>
+							<div class="sm" id="lv_tot">累计 —</div>
+						</div>
+						<div><canvas class="cx-chart" id="lv_chart" width="900" height="150"></canvas>
+							<div class="cx-legend"><span><i style="background:#22b573"></i>上传</span><span><i style="background:#4762FE"></i>下载</span></div></div>
+					</div>
+				</div>
+				<div class="cx-card">
+					<h3>代理流量统计<small id="st_hint">走了代理节点的流量；直连和国内站点不计入</small></h3>
+					<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+						<div class="cx-seg" id="st_range"><span data-v="today" class="on">今天</span><span data-v="month">本月</span><span data-v="all">近 62 天</span></div>
+						<div class="cx-help" style="margin:0" id="st_share"></div>
+					</div>
+					<div class="cx-kv" style="margin-top:16px">
+						<div><div class="k">↓ 下载</div><div class="v" id="st_dn">—</div></div>
+						<div><div class="k">↑ 上传</div><div class="v" id="st_up">—</div></div>
+						<div><div class="k">合计</div><div class="v" id="st_sum">—</div></div>
+					</div>
+					<div class="st-bars" id="st_bars" title=""></div>
+					<div class="st-axis"><span id="st_a0"></span><span>最近 30 天（每天的代理流量）</span><span id="st_a1"></span></div>
+					<table class="cx-table" style="margin-top:14px"><thead><tr><th>设备</th><th style="text-align:right">↓ 下载</th><th style="text-align:right">↑ 上传</th><th style="width:34%">占比</th></tr></thead><tbody id="st_dev"><tr><td colspan="4" class="cx-empty">暂无数据</td></tr></tbody></table>
+				</div>
+				<div class="cx-card">
+					<div class="cx-kv">
+						<div><div class="k">节点</div><div class="v" id="kv_nodes">—</div></div>
+						<div><div class="k">当前使用</div><div class="v" id="kv_cur">—</div></div>
+						<div><div class="k">订阅流量</div><div class="v" id="kv_traffic">—</div></div>
+						<div><div class="k">分流模式</div><div class="v" id="kv_mode">—</div></div>
+						<div><div class="k">活动连接</div><div class="v" id="kv_conn">—</div></div>
+						<div><div class="k">内核内存</div><div class="v" id="kv_mem">—</div></div>
+					</div>
+				</div>
+			</div>
+			<div class="cx-pane" id="p_rules">
+				<div class="cx-card">
+					<h3>规则集订阅<small>社区维护的 rule-set（MetaCubeX meta-rules-dat），每天自动更新</small></h3>
+					<div class="cx-addr"><span id="rs_info" style="color:var(--txt)">—</span><span class="cx-btn sm" id="rs_update">立即更新</span></div>
+					<div class="cx-help">分类：AI、Google、YouTube、Netflix、Disney+、Spotify、Telegram、Twitter、GitHub、gfw。智能分流下优先于 GEOIP,CN。未收录的域名在「高级 → 规则与代理地址」里写自定义规则。</div>
+				</div>
+<div class="cx-card">
+					<h3>自定义规则<small>优先于默认分流，保存后热更新，不断连接</small><small id="f_rules_dirty" style="display:none;color:var(--warn)">● 有未保存的修改</small></h3>
+					<div class="cx-field"><textarea id="f_rules" placeholder="# 每行一条，例如：&#10;DOMAIN-SUFFIX,openai.com,代理&#10;DOMAIN-SUFFIX,bilibili.com,DIRECT&#10;DOMAIN-KEYWORD,ads,REJECT"></textarea>
+						<div class="cx-help">格式：类型,值,策略。类型如 DOMAIN-SUFFIX / DOMAIN-KEYWORD / IP-CIDR；策略只能是「代理」「DIRECT」「REJECT」。以 # 开头的是注释。</div></div>
+					<div class="cx-actions"><span class="cx-btn pri" id="f_rules_save">保存规则</span></div>
+				</div>
+<div class="cx-card">
+					<h3>生效中的规则<small>自上而下依次匹配；「命中」是内核启动以来的次数</small></h3>
+					<div class="cx-wrap"><table class="cx-table"><thead><tr><th style="width:56px">#</th><th>类型</th><th>内容</th><th>策略</th><th style="width:80px">命中</th></tr></thead><tbody id="r_body"><tr><td colspan="5" class="g" style="text-align:center;padding:24px">内核运行后显示</td></tr></tbody></table></div>
+				</div>
+<div class="cx-card">
+					<h3>手动使用代理<small>不接管，由设备自行指定代理</small></h3>
+					<div class="cx-addr"><code id="f_addr">—</code><span class="cx-btn sm" id="f_copy">复制</span></div>
+					<div class="cx-help">在设备的 Wi-Fi 代理设置里手动填写该地址（HTTP / SOCKS5 混合端口），仅该设备走代理。需要内核处于运行状态。</div>
+				</div>
+
+			</div>
+		</div>
+	</div>
+
+	<div class="cx-mask" id="cx_mask"></div>
+	<div class="cx-modal" id="cx_modal">
+		<h4>透明代理</h4>
+		<div class="cx-lead">启用后，所选设备的 IPv4 / IPv6 TCP 流量由路由器经 nftables redirect 转入内核，设备端无需配置代理。</div>
+		<div class="cx-opt on" data-s="some"><b>指定设备</b><em class="cx-tag">推荐先试用</em><p>仅接管勾选的设备（按 MAC 匹配），其他设备不受影响。</p><div id="m_devs" style="margin-top:10px"></div></div>
+		<div class="cx-opt" data-s="all"><b>全部设备</b><p>接管 br-lan 下的所有设备。建议先用指定设备验证。</p></div>
+		<div class="cx-safe">🛡 保护机制：<br>· 内核自检与代理探测（境外站点经代理可达）通过后才写入转发规则；<br>· 内核或节点异常时自动撤销规则、恢复直连；<br>· 独立看门狗兜底，「恢复直连」随时可用。</div>
+		<div class="cx-ft"><span class="cx-btn" id="m_cancel">取消</span><span class="cx-btn pri" id="m_ok">开启透明代理</span></div>
+	</div>
+	<div class="cx-modal" id="cx_dg"><h4>一键自检</h4><div class="cx-lead" id="dg_sum">正在检查…</div><div id="dg_list"></div><div class="cx-ft"><span class="cx-btn pri" id="dg_close">知道了</span></div></div>
+	</div>
+
+	<script>
+	$(function () {
+		var sid = $.cookie('sessionid');
+		if (!sid) { top.location.href = 'http://' + location.host + '/index.html'; return; }
+		var MSG = { 0: '已保存', 1: '代理组件未安装', 2: '参数错误，请检查订阅地址', 3: '请先填写订阅地址', 4: '自定义规则格式有误', 5: '请至少选择一台设备', 6: '内核拒绝了这份设置，已恢复原样' };
+		var HINT = { rule: '国内直连，境外和指定服务走代理（推荐）', global: '除局域网外全部走代理', direct: '全部直连，内核保持待命' };
+		var MODE = { rule: '智能分流', global: '全部代理', direct: '全部直连' };
+		var curTab = 'overview', testing = false, cancelTest = false, nodeSort = (store('cx_sort') || 'lat'), st = null, myMac = '', nodesSig = '', pickScope = 'some', dirty = { url: false, rules: false, ua: false }, lastEv = 0, evInit = false;
+
+		/* -32002（Access denied）不一定是登录过期：后端正忙时网页服务器问不到会话权限也回这个。
+		   先隔 2.5 秒重试两次，仍然被拒才当成登录过期跳回登录页（被拒的请求没有执行过，重试是安全的）。 */
+		function ubus(method, args, _n) {
+			return $.ajax({ url: '/ubus', type: 'POST', dataType: 'json', contentType: 'application/json',
+				data: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'call', params: [sid, 'kelapi.static', method, args || {}] })
+			}).then(function (r) {
+				if (r.error && r.error.code == -32002) {
+					if ((_n || 0) < 2) { var d = $.Deferred(); setTimeout(function () { ubus(method, args, (_n || 0) + 1).then(d.resolve, d.reject); }, 2500); return d.promise(); }
+					top.location.href = 'http://' + location.host + '/index.html'; return $.Deferred().reject();
+				}
+				return (r.result && r.result[0] === 0) ? (r.result[1] || {}) : $.Deferred().reject();
+			});
+		}
+		function toast(msg, ok) { if (window.parent && window.parent.hintShaed) window.parent.hintShaed(msg, ok ? 'icon-duigouxuanzhong' : 'icon-gantanhao-yuankuang'); }
+		function esc(s) { return $('<div>').text(s == null ? '' : s).html(); }
+		function mb(n) { return (n / 1048576).toFixed(1) + ' MB'; }
+		function gb(n) { return (n / 1073741824).toFixed(1) + ' GB'; }
+		function store(k, v) { try { if (v === undefined) return sessionStorage.getItem(k); sessionStorage.setItem(k, v); } catch (e) {} return null; }
+
+		/* ---------- 保存：永远「取最新状态 → 合并改动 → 提交」，不会用过期页面覆盖 ---------- */
+		function save(patch, okMsg) {
+			return ubus('web_get_clash').then(function (cur) {
+				var a = { enabled: cur.enabled, transparent: cur.transparent, scope: cur.scope, client_macs: (cur.only_mac || []).join(','), mode: cur.mode, sub_url: cur.sub_url, rules_text: cur.rules_text || '' };
+				$.extend(a, patch || {});
+				if (a.enabled !== '1') a.transparent = '0';
+				return ubus('web_set_clash', a);
+			}).then(function (r) {
+				/* applying=1：设置已保存，但内核要 10–30 秒才换上，也可能拒绝（后端会回滚）。以前这里直接提示「已保存」，
+				   自定义规则写错被内核拒绝时，用户看到的是成功，过一会儿规则却悄悄变回去了。 */
+				if (r.status === 0 && r.applying) {
+					return applyWatch(KelUI.hold('正在让内核换上新设置，约需 10–30 秒…')).then(function (ok) {
+						if (ok) { if (patch && patch.sub_url != null) dirty.url = false; if (patch && patch.rules_text != null) { dirty.rules = false; $('#f_rules_dirty').hide(); } refresh(); }
+						return ok ? r : { status: 6 };
+					});
+				}
+				toast(MSG[r.status] || '配置失败', r.status === 0);
+				if (r.status === 0) { if (patch && patch.sub_url != null) dirty.url = false; if (patch && patch.rules_text != null) dirty.rules = false; }
+				refresh();
+				return r;
+			}, function () { toast('系统错误，请重新操作'); return { status: -1 }; });
+		}
+		/* 等后台应用完成：1.5 秒看一次 apply 状态，结束后关掉等待框并如实提示；最多等 90 秒 */
+		function applyWatch(rel) {
+			var d = $.Deferred(), n = 0;
+			(function loop() {
+				refresh().always(function () {
+					if (st && st.apply === 'running' && ++n < 60) { setTimeout(loop, 1500); return; }
+					rel();
+					if (st && st.apply === 'running') { toast('内核仍在应用设置，请稍后回来查看结果'); d.resolve(false); return; }
+					var fail = st && String(st.apply).indexOf('fail:') === 0;
+					toast(fail ? '配置失败：' + st.apply.slice(5) + '。已恢复为之前的设置' : '配置成功', !fail);
+					d.resolve(!fail);
+				});
+			})();
+			return d.promise();
+		}
+
+		/* ---------- 状态推导 ---------- */
+		function derive(d) {
+			var on = d.enabled === '1', run = d.core === 'running', tp = d.transparent === '1', hasSub = !!d.sub_url;
+			var s = { on: on, run: run, tp: tp, hasSub: hasSub };
+			s.kind = !on ? 'off' : run ? 'run' : d.phase === 'failed' ? 'fail' : d.phase === 'downloading' ? 'dl' : 'boot';
+			return s;
+		}
+		function curNode(d) {
+			var name = (d.selected && d.selected !== '自动选择' && d.selected !== '智能回退') ? d.selected : d.auto_now, hit = null;
+			(d.nodes || []).forEach(function (n) { if (n.name === name) hit = n; });
+			return { name: name || '', auto: !d.selected || d.selected === '自动选择' || d.selected === '智能回退', delay: hit ? hit.delay : 0, direct: d.selected === '智能回退' && d.fb_now === 'DIRECT' };
+		}
+
+		function scopeText(d) {
+			if (d.scope !== 'some') return '全部设备';
+			var nm = (d.only_name && d.only_name.length ? d.only_name : d.only_mac) || [];
+			return '指定 ' + nm.length + ' 台设备：' + nm.join('、');
+		}
+
+		/* ---------- 渲染：页头 + 概览 ---------- */
+		/* 首页：一句话状态 + 总开关 + 几行摘要。每行只显示「现在是什么」，要改就点进去 */
+		function renderHome(d, s) {
+			var cn = curNode(d), t, desc = '', bar = null, cls = '';
+			if (!s.hasSub) { t = '还没有添加订阅'; desc = '添加机场提供的订阅链接后即可开启。'; }
+			else if (s.kind === 'off') { t = '未开启'; desc = '打开右侧开关启动。启动本身不影响任何设备上网，哪些设备走代理在「接管设备」里选。'; }
+			else if (s.kind === 'dl') { cls = 'wait'; t = '正在准备内核…'; bar = d.size > 0 ? Math.min(99, Math.round((d.downloaded || 0) * 100 / d.size)) : 0; desc = '内核只在内存中运行，每次开机重新下载（约 1–5 分钟）；期间保持直连，不影响上网。' + (d.downloaded ? '已下载 ' + mb(d.downloaded) + (d.size ? ' / ' + mb(d.size) : '') : ''); }
+			else if (s.kind === 'boot') { cls = 'wait'; t = '正在启动…'; desc = '稍等片刻。'; }
+			else if (s.kind === 'fail') { cls = 'bad'; t = '启动遇到问题'; desc = (d.phase_msg || '内核启动失败，已保持直连，不影响上网。') + '　<a id="hm_restart">重新启动</a>'; }
+			/* 设置改了、防火墙规则还没跟上的那十来秒：如实说「正在…」，不提前说已经生效 */
+			else if (!s.tp && d.rules) { cls = 'wait'; t = '正在恢复直连…'; desc = '正在撤销透明代理规则，约 10 秒后所有设备恢复直连；在此之前仍经过代理。'; }
+			else if (s.tp && d.rules && d.synced === 0) { cls = 'wait'; t = '运行中，正在应用新的接管设置…'; desc = '接管范围或 IPv6 设置刚改过，规则正在更新（约 10 秒）；在此之前仍按原来的设置接管。'; }
+			else if (s.tp && d.rules) { cls = 'ok'; t = '运行中'; desc = '已接管' + (d.scope === 'some' ? '指定设备' : '全部设备') + '的上网流量。内核或节点异常时会自动恢复直连。'; }
+			else if (s.tp) {
+				cls = 'wait'; t = '运行中，接管尚未生效';
+				desc = d.health === 'warming' ? '探测通过，正在确认稳定（约 20 秒）。' : d.health === 'foreign-fail' ? '境外站点经代理探测失败（当前节点可能不可用），先保持直连。可以换一个延迟正常的节点。' : d.health === 'domestic-fail' ? '代理链路自检未通过，先保持直连，稍后自动重试。' : '正在检测代理是否真的可用，通过前所有设备保持直连。';
+			}
+			else { cls = 'ok'; t = '运行中，尚未接管设备'; desc = '所有设备仍是直连。在「接管设备」里选择要走代理的设备。'; }
+			$('#hm_hero').attr('class', 'hm-hero ' + (cls || 'off')); $('#hm_t').text(t); $('#hm_d').html(desc); $('#hm_sw_t').text(s.on ? '已开启' : '已关闭');
+			if (bar !== null) $('#hero_bar').show().find('b').css('width', bar + '%'); else $('#hero_bar').hide();
+			$('#hm_sw').toggleClass('on', s.on);
+			$('#hm_rows').toggleClass('idle', !s.run);
+			$('#hm_node').text(!s.run ? '—' : cn.direct ? '已回退直连' : cn.name ? cn.name : '正在获取…');
+			$('#hm_node_s').html(!s.run ? '开启后可选择' : cn.direct ? '所有节点暂不可用' : (cn.auto ? '自动选择' : '手动选择') + (cn.delay > 0 ? ' · <b class="' + latCls(cn.delay) + '">' + cn.delay + ' ms</b>' : ''));
+			$('#hm_scope').text(!s.tp ? '未接管' : d.scope === 'some' ? '指定 ' + (d.only_mac || []).length + ' 台设备' : '全部设备'); $('#hm_scope').attr('title', s.tp ? scopeText(d) : '所有设备直连');
+			$('#hm_restore').toggle(s.tp);
+			var set = SVCS.filter(function (x) { return ((d.svc || {})[x.k] || 'follow') !== 'follow'; }).map(function (x) { var v = d.svc[x.k]; return x.n.replace(/（.*$/, '') + ' → ' + (v.indexOf('region:') === 0 ? v.slice(7).replace(/,/g, '/') : '固定节点'); });
+			$('#hm_svc').text(set.length ? set.join('，') : '全部跟随当前节点');
+			var n = (d.nodes || []).length, ok = (d.nodes || []).filter(function (x) { return x.delay > 0; }).length;
+			$('#hm_sub').text(!s.hasSub ? '未添加' : (s.run && n ? ok + ' / ' + n + ' 个节点可用' : '已添加'));
+			$('#hm_sub_s').text(d.traffic ? '已用 ' + gb(d.traffic.used) + (d.traffic.total > 1073741824 ? ' / ' + gb(d.traffic.total) : '') : (s.hasSub ? '' : '点击添加订阅链接'));
+			$('#kv_nodes').html(s.run ? (n ? ok + '<small>/ ' + n + ' 可用</small>' : '—') : '—');
+			$('#kv_cur').text(s.run ? (cn.name ? (cn.auto ? '自动 · ' : '') + cn.name : '—') : '—').attr('title', cn.name);
+			$('#kv_traffic').html(d.traffic ? gb(d.traffic.used) + (d.traffic.total > 1073741824 ? '<small>/ ' + gb(d.traffic.total) + '</small>' : '<small>不限量</small>') : '—');
+			$('#kv_mode').text(MODE[d.mode] || '—');
+		}
+
+		/* ---------- 节点页 ---------- */
+		function latCls(x) { return x <= 0 ? 'x' : x < 150 ? 'g' : x < 300 ? 'o' : 'r'; }
+		function latTxt(n) { return n.delay > 0 ? n.delay + ' ms' : (n.tested ? '超时' : '未测速'); }
+		function renderNodes(d, s) {
+			$('#cx_mode span').removeClass('on').filter('[data-m=' + d.mode + ']').addClass('on');
+			$('#cx_modehint').text(HINT[d.mode] || '');
+			var box = $('#cx_nodes');
+			if (!s.run) {
+				var sig0 = 'off:' + s.kind; if (sig0 === nodesSig) return; nodesSig = sig0;
+				box.html('<div class="cx-card"><div class="cx-empty"><div class="big">🔌</div>' + (s.hasSub ? '内核未运行，启动后即可选择节点。' : '请先添加订阅。') + '<br><br><span class="cx-btn pri" data-go="' + (s.hasSub ? 'start' : 'settings') + '">' + (s.hasSub ? '启动内核' : '去添加订阅') + '</span></div></div>');
+				return;
+			}
+			if (testing) return;		// 测速期间冻结整体渲染：结果就地更新，列表不乱跳（测完统一重排）
+			var list = (d.nodes || []).slice();
+			if (nodeSort === 'lat') list.sort(function (a, b) { return (a.delay > 0 ? a.delay : 1e9) - (b.delay > 0 ? b.delay : 1e9); });
+			var sig = JSON.stringify([nodeSort, d.selected, d.auto_now, d.fb_now, list.map(function (n) { return [n.name, n.delay, n.tested]; })]);
+			if (sig === nodesSig) return; nodesSig = sig;
+			if (!list.length) { box.html('<div class="cx-card"><div class="cx-empty"><div class="big">📭</div>尚未获取到节点。点「更新订阅」重试，或检查订阅链接是否有效。</div></div>'); return; }
+			var html = '<div class="cx-grid">';
+			var autoS = esc(d.auto_now || '');
+			html += '<div class="cx-node auto smart' + (d.selected === '智能回退' ? ' sel' : '') + '" data-name="智能回退"><div class="nm">智能模式（推荐）</div><div class="meta"><span class="tp">故障时直连</span><span class="cx-lat ' + (d.fb_now === 'DIRECT' ? 'o' : 'g') + '" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + autoS + '">' + (d.fb_now === 'DIRECT' ? '已回退直连' : autoS) + '</span></div></div>';
+			html += '<div class="cx-node auto' + (d.selected === '自动选择' ? ' sel' : '') + '" data-name="自动选择"><div class="nm">自动选择</div><div class="meta"><span class="tp">仅代理</span><span class="cx-lat g" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + autoS + '">' + autoS + '</span></div></div>';
+			list.forEach(function (n) {
+				html += '<div class="cx-node' + (n.delay > 0 || !n.tested ? '' : ' dead') + (d.selected === n.name ? ' sel' : '') + '" data-name="' + esc(n.name) + '" title="' + esc(n.name) + '"><div class="nm">' + esc(n.name) + '</div><div class="meta"><span class="tp">' + esc(n.type) + '</span><span class="cx-lat ' + latCls(n.delay) + '" data-test="1" title="点击重新测速这个节点">' + latTxt(n) + '</span></div></div>';
+			});
+			box.html(html + '</div>');
+		}
+
+		/* ---------- 设置 / 高级面板 ---------- */
+		function renderSettings(d) {
+			/* 用「有没有改动」而不是「有没有焦点」保护草稿：点到别处再回来，没保存的内容也不会被刷新冲掉 */
+			if (!dirty.url && !$('#f_url').is(':focus')) $('#f_url').data('real', d.sub_url).val(maskUrl(d.sub_url));
+			if (!dirty.ua && !$('#f_ua').is(':focus')) uaShow(d.ua || d.ua_default);
+			$('#f_ua_dirty').toggle(dirty.ua);
+			if (!dirty.rules) $('#f_rules').val(d.rules_text || '');
+			$('#f_url_dirty').toggle(dirty.url); $('#f_rules_dirty').toggle(dirty.rules);
+			$('#f_v6 span').removeClass('on').filter('[data-v=' + (d.ipv6 === 'direct' ? 'direct' : 'proxy') + ']').addClass('on'); $('#v6_hint').text(d.ipv6 === 'direct' ? 'IPv6 不走代理：有地区限制的服务（Claude、ChatGPT 等）会因国内 IPv6 出口失败' : '接管设备的 IPv6 TCP 同样按规则分流（有 IPv6 上联时必须保持）'); renderSvc(d);
+			$('#f_quic span').removeClass('on').filter('[data-v=' + (d.quic === 'allow' ? 'allow' : 'block') + ']').addClass('on');
+			$('#quic_hint').text(d.quic === 'allow' ? 'UDP 不经过代理：用 HTTP/3 的 App 会直连国外，被封锁时要等几秒才回落，也可能绕过代理' : (d.quic_on ? '已生效：用 HTTP/3 的 App 会立刻回落到 TCP 并走代理；国内站点（智能分流下）不受影响' : '拦截已开启，等待透明代理生效后装入；直连模式下不拦'));
+			$('#f_asw span').removeClass('on').filter('[data-v=' + (d.auto_switch === '0' ? '0' : '1') + ']').addClass('on');
+			$('#rs_info').text(d.ruleset_n ? '已载入 ' + d.ruleset_n + ' 个社区分流规则集' + (d.ruleset_at ? '，上次更新 ' + new Date(d.ruleset_at * 1000).toLocaleString() : '') : '暂未载入（下载失败时使用内置规则，不影响使用）');
+			$('#f_addr').text((d.lan_ip || '路由器IP') + ':7890');
+			$('#sub_meta').text(d.updated_at ? '上次更新 ' + new Date(d.updated_at).toLocaleString() : '');
+		}
+		function renderAlert(d, s) {
+			var a = $('#cx_alert').attr('class', 'cx-alert'), msg = '', cls = '';
+			var n = (d.nodes || []).length, ok = (d.nodes || []).filter(function (x) { return x.delay > 0; }).length;
+			if (s.on && !d.guard) { cls = 'bad'; msg = '⚠️ 守护进程未运行（异常）。为安全起见，转发规则会被系统看门狗自动撤销，所有设备保持直连。点击「重新启动」可恢复。'; }
+			else if (s.run && d.health === 'fallback') { cls = 'wait'; msg = '🟡 所有节点当前不可用，已自动回退为直连：能直连的网站照常打开，需要代理的网站暂时打不开。节点恢复后会自动切回。'; }
+			else if (s.run && n && !ok) { cls = 'bad'; msg = '🔴 所有节点当前都测不通。请稍后点「节点」页的「测速」，或「更新订阅」；订阅可能已过期。'; }
+			if (msg) a.addClass('on ' + cls).html(msg);
+		}
+		function render(d) {
+			st = d; var s = derive(d);
+			renderHome(d, s); renderNodes(d, s); renderSettings(d); renderAlert(d, s); afterRender();
+		}
+		/* 内核热重载期间后端不查节点（busy=1）：沿用上一次的节点数据，页面不会闪成「没有节点」 */
+		var KEEP = ['nodes', 'selected', 'auto_now', 'fb_now', 'traffic', 'updated_at', 'svc_now'];
+		function refresh() { return ubus('web_get_clash').then(function (d) { if (d.busy && st) KEEP.forEach(function (k) { d[k] = st[k]; }); render(d); }); }
+
+		/* ---------- 交互 ---------- */
+		var SUBS = ['conns', 'logs', 'traffic', 'rules'];
+		/* 导航：首页（overview）→ 二级页（nodes/svc/sub/set）→ 三级页（conns/logs/traffic/rules，从「更多」进）。
+		   不用页签：页签会把所有东西都摆在眼前；这里每次只看一件事，左上角「返回」回上一层。 */
+		var TITLE = { nodes: '节点', svc: '按服务选节点', sub: '订阅', set: '更多设置', conns: '连接', logs: '日志', traffic: '流量与状态', rules: '规则与代理地址' };
+		var DESC = { nodes: '选择出口节点；延迟越低越快', svc: '让某类服务固定走指定地区或节点，其余跟随当前节点', sub: '机场提供的订阅链接，节点从这里来', set: 'IPv6、自动切换节点、运行记录和高级工具' };
+		function goSub() { goTab('sub'); $('#f_url').focus(); }
+		function goTab(t) {
+			if (!$('#p_' + t).length) t = 'overview';
+			var deep = SUBS.indexOf(t) >= 0;
+			$('#cx_back').toggle(t !== 'overview').data('to', deep ? 'set' : 'overview'); $('.cx-head').toggle(t === 'overview');	/* 二级页顶部只留返回栏，不重复大标题 */ $('#cx_back_t').text(TITLE[t] || ''); $('#cx_back_d').text(DESC[t] || '');
+			$('#cx_subbar').toggle(deep); if (deep) $('#cx_sub span').removeClass('on').filter('[data-t=' + t + ']').addClass('on');
+			$('.cx-pane').removeClass('on'); $('#p_' + t).addClass('on'); store('cx_tab', t); curTab = t; pollNow();
+			try { top.scrollTo(0, 0); } catch (e) {}
+		}
+		$('#cx_back_b').on('click', function () { goTab($('#cx_back').data('to') || 'overview'); });
+		$('#cx_sub').on('click', 'span', function () { goTab($(this).data('t')); });
+		$('.cx').on('click', '.hm-row.go, .hm-tile.go', function (e) {
+			if ($(e.target).closest('#hm_restore').length) { act('restore'); return; }
+			var g = $(this).data('go');
+			if (g === 'scope') { if (!st || st.core !== 'running') { toast('请先开启代理加速'); return; } openModal(); }
+			else if ((g === 'nodes' || g === 'svc') && (!st || !st.sub_url)) goSub();
+			else goTab(g);
+		});
+		$('#hm_sw').on('click', function () { act(st && st.enabled === '1' ? 'stop' : 'start'); });
+		$('#hm_d').on('click', '#hm_restart', function () { act('restart'); });
+
+		function act(a) {
+			if (a === 'goSettings') goSub();
+			else if (a === 'start') { if (!st || !st.sub_url) { goSub(); toast('请先填写订阅地址'); return; } save({ enabled: '1' }); }
+			else if (a === 'stop') { if (st && st.transparent === '1' && !confirm('关闭内核会同时恢复所有设备直连，确定吗？')) return; save({ enabled: '0', transparent: '0' }); }
+			else if (a === 'restart') { ubus('web_set_clash', { enabled: '1', transparent: st.transparent, scope: st.scope, client_macs: (st.only_mac || []).join(','), mode: st.mode, sub_url: st.sub_url, rules_text: st.rules_text || '', restart: '1' }).then(function () { toast('正在重新启动', true); refresh(); }); }
+			else if (a === 'restore') save({ transparent: '0' });
+			else if (a === 'takeover') openModal();
+		}
+		$('#cx_nodes').on('click', '[data-go]', function () { var g = $(this).data('go'); act(g === 'settings' ? 'goSettings' : g); });
+		$('#cx_nodes').on('click', '.cx-node', function () {
+			var el = $(this), name = el.data('name');
+			$('.cx-node').removeClass('sel'); el.addClass('sel');
+			ubus('web_clash_select', { name: String(name) }).then(function (r) {
+				toast(r.status === 0 ? '已切换到：' + name : '切换失败，节点可能已变化', r.status === 0); nodesSig = ''; refresh();
+			}, function () { toast('切换失败'); nodesSig = ''; refresh(); });
+		});
+		$('#cx_mode').on('click', 'span', function () {
+			var m = $(this).data('m'); $('#cx_mode span').removeClass('on'); $(this).addClass('on'); $('#cx_modehint').text(HINT[m]);
+			ubus('web_clash_mode', { mode: m }).then(function (r) { toast(r.status === 0 ? '已切换为：' + MODE[m] : '切换失败，内核没有接受，已保持原模式', r.status === 0); refresh(); }, function () { toast('切换失败'); refresh(); });
+		});
+		/* ---------- 测速：逐节点并发（6 路），实时进度，结果就地出现，测完统一排序 ---------- */
+		function nodeCard(name) { return $('#cx_nodes .cx-node').filter(function () { return $(this).attr('data-name') === name; }); }
+		function setPill(name, cls, txt, busy) { var p = nodeCard(name).find('.cx-lat[data-test]'); p.attr('class', 'cx-lat ' + cls + (busy ? ' busy' : '')).text(txt); }
+		function testOne(name) {
+			setPill(name, 'x', '检测中', true);
+			return ubus('web_clash_delay', { name: name }).then(function (r) {
+				var ms = r.status === 0 ? r.delay : 0; setPill(name, latCls(ms), ms > 0 ? ms + ' ms' : '超时'); return ms;
+			}, function () { setPill(name, 'x', '失败'); return 0; });
+		}
+		$('#cx_nodes').on('click', '.cx-lat[data-test]', function (e) {
+			e.stopPropagation(); if (testing) return;
+			var name = String($(this).closest('.cx-node').attr('data-name'));
+			testing = true; testOne(name).always(function () { testing = false; nodesSig = ''; setTimeout(refresh, 400); });
+		});
+		function testAll() {
+			if (testing) { cancelTest = true; $('#n_test').text('正在停止…'); return; }
+			var names = (st && st.nodes || []).map(function (n) { return n.name; });
+			if (!st || st.core !== 'running') { toast('内核未运行'); return; }
+			if (!names.length) { toast('还没有节点，请先更新订阅'); return; }
+			testing = true; cancelTest = false; var total = names.length, t0 = 0, ticks = 0, seen = {};
+			names.forEach(function (n) { setPill(n, 'x', '检测中', true); });
+			$('#n_test').text('检测中 0/' + total + '（点击停止）').removeClass('pri').addClass('danger');
+			function finish(stopped, nodes) {
+				testing = false; cancelTest = false; nodesSig = '';
+				var ok = 0, best = null; (nodes || []).forEach(function (n) { if (n.delay > 0) { ok++; if (!best || n.delay < best.delay) best = n; } });
+				$('#n_test').text('测速全部节点').removeClass('danger').addClass('pri');
+				var t = new Date(); function z(x) { return (x < 10 ? '0' : '') + x; } $('#n_last').text('上次测速 ' + z(t.getHours()) + ':' + z(t.getMinutes()) + ':' + z(t.getSeconds()));
+				toast((stopped ? '已停止：' : '测速完成：') + ok + '/' + total + ' 个可用' + (best ? '，最快 ' + best.delay + ' ms' : ''), ok > 0);
+				setTimeout(refresh, 300);
+			}
+			function poll() {
+				if (cancelTest) return finish(true, st && st.nodes);
+				ubus('web_get_clash').then(function (d) {
+					st = d; var done = 0;
+					(d.nodes || []).forEach(function (n) {
+						if (n.at >= t0) { done++; if (!seen[n.name] || seen[n.name] !== n.delay) { seen[n.name] = n.delay; setPill(n.name, latCls(n.delay), n.delay > 0 ? n.delay + ' ms' : '超时'); } }
+					});
+					$('#n_test').text('检测中 ' + done + '/' + total + '（点击停止）');
+					if (done >= total || ++ticks > 18) return finish(false, d.nodes);
+					setTimeout(poll, 900);
+				}, function () { finish(true, st && st.nodes); });
+			}
+			ubus('web_clash_testall', { target: 'sub' }).then(function (r) { if (r.status !== 0) { finish(true, []); toast('内核未运行'); return; } t0 = r.now; setTimeout(poll, 1200); }, function () { finish(true, []); toast('测速启动失败'); });
+		}
+		$('#n_test').on('click', testAll);
+		$('#n_update').on('click', function () {
+			if (testing) return; var b = $(this).addClass('dis').text('更新中…');
+			ubus('web_clash_refresh', { target: 'sub' }).then(function (r) {
+				if (r.status === 0) { toast('订阅已更新：' + r.nodes + ' 个节点', true); nodesSig = ''; refresh().then(function () { setTimeout(testAll, 300); }); }
+				else toast(r.status === 1 ? '内核未运行' : '订阅更新失败：订阅站连不上或返回的不是订阅内容，已保留原有节点');
+			}, function () { toast('订阅更新失败'); }).always(function () { b.removeClass('dis').text('更新订阅'); });
+		});
+		$('#n_sort').on('click', 'span', function () { nodeSort = String($(this).data('k')); store('cx_sort', nodeSort); $('#n_sort span').removeClass('on'); $(this).addClass('on'); nodesSig = ''; if (st) renderNodes(st, derive(st)); });
+		$('#n_sort span').removeClass('on').filter('[data-k=' + nodeSort + ']').addClass('on');
+		/* 订阅地址里带着账号密钥（token），平时只显示打了码的；点进输入框才显示完整地址（防旁人看屏幕/截图泄漏） */
+		function maskUrl(u) { return String(u || '').replace(/([?&][^=&]+=)([^&]{4})[^&]+/g, '$1$2••••••'); }
+		function urlVal() { var $u = $('#f_url'); return $.trim((dirty.url || $u.is(':focus')) ? $u.val() : ($u.data('real') || '')); }
+		$('#f_url').on('focus', function () { if (!dirty.url) $(this).val($(this).data('real') || ''); })
+			.on('blur', function () { if (!dirty.url) $(this).val(maskUrl($(this).data('real'))); });
+		function uaMissing() { if ($('#f_ua_sel').val() === 'c' && !uaVal()) { toast('请填写自定义的客户端标识，或在列表里选一个'); $('#f_ua').focus(); return true; } return false; }
+		$('#f_url_check').on('click', function () { var u = urlVal(); if (!u) { toast('请先填写订阅地址'); return; } if (uaMissing()) return; checkSub(u); });
+		$('#f_url_save').on('click', function () {
+			var u = urlVal(); if (!u) { toast('请先填写订阅地址'); return; }
+			if (uaMissing()) return;
+			checkSub(u).then(function (ok) {
+				if (!ok && !confirm('这个订阅链接没有通过检查，仍要保存吗？')) return;
+				var uaChg = st && (uaVal() || st.ua_default) !== st.ua;
+				if (st && (u !== st.sub_url || uaChg) && st.enabled === '1' && !confirm((u !== st.sub_url ? '更换订阅' : '修改客户端标识') + '会重启内核（约 10 秒）。确定吗？')) return;
+				save({ sub_url: u, ua: uaVal() }).then(function (r) { if (r && r.status === 0) { dirty.ua = false; $('#f_ua_dirty').hide(); } });
+			});
+		});
+		$('#f_rules_save').on('click', function () { save({ rules_text: $('#f_rules').val() }); });
+		$('#f_copy').on('click', function () {
+			var t = $('#f_addr').text(), ta = $('<textarea>').val(t).appendTo('body').select();
+			try { document.execCommand('copy'); toast('已复制：' + t, true); } catch (e) { toast(t); } ta.remove();
+		});
+
+		/* ---------- IPv6 开关 / 按服务选节点 ---------- */
+		var REGIONS = { '美国': ['美国', '🇺🇸', /(^|[^A-Za-z])(US|USA)([^A-Za-z]|$)/], '日本': ['日本', '🇯🇵', /(^|[^A-Za-z])JP([^A-Za-z]|$)/], '新加坡': ['新加坡', '🇸🇬', /(^|[^A-Za-z])(SG|Singapore)([^A-Za-z]|$)/], '香港': ['香港', '🇭🇰', /(^|[^A-Za-z])HK([^A-Za-z]|$)/], '台湾': ['台湾', '🇹🇼', /(^|[^A-Za-z])TW([^A-Za-z]|$)/], '韩国': ['韩国', '🇰🇷', /(^|[^A-Za-z])KR([^A-Za-z]|$)/], '英国': ['英国', '🇬🇧', /(^|[^A-Za-z])(UK|GB)([^A-Za-z]|$)/], '德国': ['德国', '🇩🇪', /(^|[^A-Za-z])DE([^A-Za-z]|$)/] };
+		/* 服务清单：与后端 SVC_KEYS、run.sh 的 SVC_LIST 保持一致 */
+		var SVCS = [
+			{ k: 'ai', key: 'svc_ai', n: 'AI（OpenAI / Claude / Gemini 等）' },
+			{ k: 'google', key: 'svc_google', n: 'Google（搜索 / Gmail / YouTube 等）' },
+			{ k: 'media', key: 'svc_media', n: '流媒体（Netflix / Disney+ / Spotify 等）' },
+			{ k: 'telegram', key: 'svc_telegram', n: 'Telegram' },
+			{ k: 'twitter', key: 'svc_twitter', n: 'X（Twitter）' },
+			{ k: 'github', key: 'svc_github', n: 'GitHub' }
+		];
+		/* 交互沿用原厂表单的做法：改完点一次「保存」→ 页面正中出现等待框（KelUI.hold，原厂 .HintDialog 样式）
+		   一直等到内核真的换上新设置（后端后台热重载 10–40 秒）→「配置成功」或失败原因。
+		   一次保存只触发一次热重载（逐项自动保存会让内核连续重载好几次，路由器吃不消）。
+		   每行右侧如实显示该服务当前实际使用的节点。svcDirty=有未保存的改动（此时轮询不覆盖本地选择）。 */
+		var svcState = {}, svcDirty = false, svcSig = '', svcBusy = false, svcErr = {};
+		function inRegion(name, r) { var x = REGIONS[r]; return name.indexOf(x[0]) >= 0 || name.indexOf(x[1]) >= 0 || x[2].test(name); }
+		function parseSvc(v) { v = v || 'follow'; if (v.indexOf('region:') === 0) return { mode: 'region', regions: v.slice(7).split(','), node: '' }; if (v.indexOf('node:') === 0) return { mode: 'node', regions: [], node: v.slice(5) }; return { mode: 'follow', regions: [], node: '' }; }
+		function svcValue(o) { return o.mode === 'region' ? 'region:' + o.regions.join(',') : o.mode === 'node' ? 'node:' + o.node : 'follow'; }
+		function svcStatus(d, k, o) {
+			if (svcErr[k]) return ['bad', svcErr[k]];
+			if (svcBusy || d.apply === 'running') return ['wait', '正在生效…'];
+			if (svcDirty && svcValue(o) !== ((d.svc || {})[k] || 'follow')) return ['wait', '已修改，待保存'];
+			if (o.mode === 'follow') return ['', '跟随「代理」组'];
+			if (d.core !== 'running') return ['', '内核未运行，启动后生效'];
+			if (d.mode !== 'rule') return ['', '当前不是「智能分流」，暂不生效'];
+			var now = (d.svc_now || {})[k];
+			if (now) return ['ok', '当前使用：' + now];
+			return ['wait', o.mode === 'region' ? '所选地区暂时没有可用节点，先跟随「代理」组' : '所选节点不在当前订阅里，先跟随「代理」组'];
+		}
+		function renderSvc(d) {
+			if (!svcDirty) SVCS.forEach(function (x) { svcState[x.k] = parseSvc((d.svc || {})[x.k]); });
+			var names = (d.nodes || []).map(function (n) { return n.name; });
+			var stat = {}; SVCS.forEach(function (x) { stat[x.k] = svcStatus(d, x.k, svcState[x.k]); });
+			var sig = JSON.stringify([svcState, names]);
+			if (sig !== svcSig || arguments[1]) {
+				svcSig = sig;
+				var html = '';
+				SVCS.forEach(function (x) {
+					var o = svcState[x.k];
+					html += '<div class="svc" data-k="' + x.k + '"><div class="svc-head"><b>' + x.n + '</b><div class="cx-seg svc-mode">';
+					[['follow', '跟随全局'], ['region', '指定地区'], ['node', '指定节点']].forEach(function (m) { html += '<span data-v="' + m[0] + '"' + (o.mode === m[0] ? ' class="on"' : '') + '>' + m[1] + '</span>'; });
+					html += '</div><span class="svc-st"></span></div>';
+					if (o.mode === 'region') {
+						html += '<div class="svc-body">';
+						Object.keys(REGIONS).forEach(function (r) { var n = names.filter(function (nm) { return inRegion(nm, r); }).length; html += '<span class="svc-pill' + (o.regions.indexOf(r) >= 0 ? ' on' : '') + (n ? '' : ' none') + '" data-r="' + r + '"' + (n ? '' : ' title="当前订阅里没有这个地区的节点"') + '>' + r + '<em>' + n + '</em></span>'; });
+						html += '<span class="svc-tip">可多选，在所选地区里自动用延迟最低的节点</span></div>';
+					} else if (o.mode === 'node') {
+						html += '<div class="svc-body"><select class="svc-node">';
+						if (o.node && names.indexOf(o.node) < 0) html += '<option value="' + esc(o.node) + '" selected>' + esc(o.node) + '（已不在订阅里）</option>';
+						names.forEach(function (nm) { html += '<option value="' + esc(nm) + '"' + (nm === o.node ? ' selected' : '') + '>' + esc(nm) + '</option>'; });
+						html += '</select></div>';
+					}
+					html += '</div>';
+				});
+				$('#svc_rows').html(html);
+			}
+			/* 状态条每次都更新（不重建整行，正在操作的下拉框/按钮不会被打断） */
+			SVCS.forEach(function (x) { var t = stat[x.k], $s = $('#svc_rows .svc[data-k=' + x.k + '] .svc-st'), h = (t[0] === 'wait' && (svcBusy || d.apply === 'running') ? '<i class="kel-spin"></i>' : '') + esc(t[1]), c = 'svc-st ' + t[0]; if ($s.data('h') !== h + c) $s.data('h', h + c).attr('class', c).html(h); });
+			$('#svc_note').toggle(d.mode !== 'rule'); $('#svc_save').toggleClass('dis', !svcDirty); $('#svc_dirty').toggle(svcDirty);
+		}
+		function svcTouch(k) {
+			delete svcErr[k];
+			svcDirty = SVCS.some(function (x) { return svcValue(svcState[x.k]) !== ((st.svc || {})[x.k] || 'follow'); });	/* 改回原样就不算有改动 */
+			renderSvc(st, true);
+		}
+		function svcCommit() {
+			var patch = {}, bad = false;
+			SVCS.forEach(function (x) { var o = svcState[x.k]; if (o.mode === 'region' && !o.regions.length) { svcErr[x.k] = '请至少选一个地区'; bad = true; } if (o.mode === 'node' && !o.node) { svcErr[x.k] = '请选择一个节点'; bad = true; } patch[x.key] = svcValue(o); });
+			if (bad) { renderSvc(st, true); return; }	/* 不完整的选择不提交，保持本地状态等用户补全 */
+			var rel = KelUI.hold('正在保存…');
+			ubus('web_get_clash').then(function (cur) {
+				var a = { enabled: cur.enabled, transparent: cur.transparent, scope: cur.scope, client_macs: (cur.only_mac || []).join(','), mode: cur.mode, sub_url: cur.sub_url, rules_text: cur.rules_text || '' };
+				return ubus('web_set_clash', $.extend(a, patch));
+			}).then(function (r) {
+				if (r.status !== 0) { rel(); toast(MSG[r.status] || '配置失败，请重新配置'); return; }
+				svcDirty = false;
+				if (!r.applying) { rel(); toast('配置成功', true); refresh(); return; }
+				svcBusy = true; rel.text('正在让内核换上新设置，约需 10–30 秒…'); svcWatch(rel);
+			}, function () { rel(); toast('系统错误，请重新操作'); });
+		}
+		/* 等后台生效：1.5 秒看一次，直到 apply 不再是 running；失败时后端已回滚，把原因告诉用户 */
+		function svcWatch(rel) {
+			refresh().always(function () {
+				if (st && st.apply === 'running') { setTimeout(function () { svcWatch(rel); }, 1500); return; }
+				svcBusy = false; rel();
+				if (st && String(st.apply).indexOf('fail:') === 0) toast('配置失败：' + st.apply.slice(5) + '。已恢复为之前的设置');
+				else toast('配置成功', true);
+				renderSvc(st, true);
+			});
+		}
+		$('#svc_save').on('click', function () { if (svcDirty) svcCommit(); });
+		$('#svc_rows').on('click', '.svc-mode span', function () {
+			var k = $(this).closest('.svc').data('k'), o = svcState[k], m = $(this).data('v'); if (o.mode === m) return; o.mode = m;
+			if (m === 'region' && !o.regions.length) { var names = ((st && st.nodes) || []).map(function (n) { return n.name; }); o.regions = Object.keys(REGIONS).filter(function (r) { return names.some(function (nm) { return inRegion(nm, r); }); }).slice(0, 1); }
+			if (m === 'node' && !o.node) o.node = ((st && st.nodes && st.nodes[0]) || {}).name || '';
+			svcTouch(k);
+		});
+		$('#svc_rows').on('click', '.svc-pill', function () {
+			if ($(this).hasClass('none') && !$(this).hasClass('on')) return;
+			var k = $(this).closest('.svc').data('k'), o = svcState[k], r = $(this).data('r'), i = o.regions.indexOf(r);
+			if (i < 0) o.regions.push(r); else o.regions.splice(i, 1);
+			svcTouch(k);
+		});
+		$('#svc_rows').on('change', '.svc-node', function () { var k = $(this).closest('.svc').data('k'); svcState[k].node = this.value; svcTouch(k); });
+		$('#f_v6').on('click', 'span', function () { save({ ipv6: String($(this).data('v')) }); });
+		$('#f_quic').on('click', 'span', function () { save({ quic: String($(this).data('v')) }); });
+
+		/* 透明代理弹窗：指定设备（勾选）/ 全家 */
+		function openModal() {
+			var keep = {}; ((st && st.only_mac) || []).forEach(function (m) { keep[String(m).toLowerCase()] = 1; });
+			if (!Object.keys(keep).length && myMac) keep[myMac.toLowerCase()] = 1;
+			pickScope = (st && st.scope === 'all' && st.transparent === '1') ? 'all' : 'some';
+			$('.cx-opt').removeClass('on').filter('[data-s=' + pickScope + ']').addClass('on');
+			$('#m_devs').html('<span class="cx-help">读取设备列表…</span>');
+			$('#cx_mask, #cx_modal').show(); KelUI.place('#cx_modal');
+			ubus('web_get_device_list').then(function (r) {
+				var html = '';
+				(r.device_list || []).forEach(function (x) {
+					if (x.online !== '1' || x.is_guest === 1) return;
+					var mac = String(x.id).toLowerCase(), me = (myMac && mac === myMac.toLowerCase());
+					html += '<label style="display:flex;gap:8px;align-items:center;margin:6px 0;font-weight:400;cursor:pointer"><input type="checkbox" class="m_dev" value="' + esc(mac) + '"' + (keep[mac] ? ' checked' : '') + '><span>' + esc(x.name || String(x.id).toUpperCase()) + (me ? ' <em class="cx-tag">本设备</em>' : '') + '</span><span class="g" style="color:var(--mute);font-size:12px">' + esc(x.ip) + '</span></label>';
+				});
+				$('#m_devs').html(html || '<span class="cx-help">没有找到在线设备</span>');
+			}, function () { $('#m_devs').html('<span class="cx-help">读取设备列表失败</span>'); });
+		}
+		function closeModal() { $('#cx_mask, #cx_modal, #cx_dg').hide(); }
+		$('#cx_modal .cx-opt').on('click', function (e) { if ($(e.target).is('input,label,span.g')) { if ($(e.target).is('input')) { pickScope = 'some'; $('#cx_modal .cx-opt').removeClass('on').filter('[data-s=some]').addClass('on'); } return; } pickScope = $(this).data('s'); $('#cx_modal .cx-opt').removeClass('on'); $(this).addClass('on'); });
+		$('#m_cancel, #cx_mask, #dg_close').on('click', closeModal);
+		$('#m_ok').on('click', function () {
+			var macs = $('.m_dev:checked').map(function () { return this.value; }).get();
+			if (pickScope === 'some' && !macs.length) { toast('请至少勾选一台设备'); return; }
+			closeModal(); save({ enabled: '1', transparent: '1', scope: pickScope, client_macs: pickScope === 'some' ? macs.join(',') : '' });
+		});
+
+		/* 订阅检查：能不能打开、是不是订阅、有几条节点 */
+		var SUBERR = { 2: '链接格式不对，请检查是否完整复制', 3: '链接打不开：路由器现在连不上这个订阅网站', 4: '订阅网站返回了错误（HTTP {c}），链接可能已失效', 5: '链接打开的是一个网页，不是订阅内容，请确认复制的是「订阅链接」', 6: '链接能打开，但里面没有找到节点' };
+		/* 客户端标识：下拉选常见客户端；不在列表里的（或要改版本号）选「自定义」再填 */
+		var UAS = [
+			{ v: '', n: '默认（clash.meta）' },
+			{ v: 'FlClash/v0.8.92 clash-verge Platform/macos', n: 'FlClash 0.8.92' },
+			{ v: 'clash-verge/v2.4.3', n: 'Clash Verge 2.4.3' },
+			{ v: 'ClashMetaForAndroid/2.11.18.Meta', n: 'Clash Meta for Android 2.11.18' },
+			{ v: 'mihomo/1.19.31', n: 'mihomo 内核 1.19.31' },
+			{ v: 'v2rayN/7.15.0', n: 'v2rayN 7.15.0（链接列表格式）' }
+		];
+		$('#f_ua_sel').html(UAS.map(function (x, i) { return '<option value="' + i + '">' + esc(x.n) + '</option>'; }).join('') + '<option value="c">自定义…</option>');
+		function uaVal() { var k = $('#f_ua_sel').val(); return k === 'c' ? $.trim($('#f_ua').val()) : UAS[+k].v; }
+		/* 把已保存的标识显示出来：在列表里就选中它，不在就落到「自定义」并把原文放进输入框 */
+		function uaShow(ua) {
+			var i = -1; UAS.forEach(function (x, k) { if ((x.v || (st && st.ua_default) || 'clash.meta') === ua) i = k; });
+			$('#f_ua_sel').val(i >= 0 ? String(i) : 'c'); $('#f_ua').toggle(i < 0).val(i < 0 ? ua : '');
+		}
+		function uaTouch() { dirty.ua = !st || (uaVal() || st.ua_default) !== st.ua; $('#f_ua_dirty').toggle(dirty.ua); $('#f_url_res').text(''); }	/* 改回原样就不算有改动 */
+		function checkSub(u) {
+			$('#f_url_res').css('color', 'var(--mute)').text('检查中…（最多 15 秒）');
+			return ubus('web_clash_check_sub', { url: u, ua: uaVal() }).then(function (r) {
+				if (r.status === 0) { $('#f_url_res').css('color', 'var(--ok)').text('✓ 订阅有效，共 ' + r.nodes + ' 条节点' + (r.via === 'proxy' ? '（路由器直连这个订阅站不稳定，这次是经代理节点取到的）' : '')); return true; }
+				if (r.status === 7) { $('#f_url_res').css('color', 'var(--bad)').text('✗ 这个订阅里没有可用节点：机场返回的是公告而不是节点（「' + (r.notice || '') + '」）。通常是机场已停止支持 Clash 类客户端，或要求使用它自己的客户端，请到机场官网确认'); return false; }
+				$('#f_url_res').css('color', 'var(--bad)').text('✗ ' + (SUBERR[r.status] || '检查失败').replace('{c}', r.code || '')); return false;
+			}, function () { $('#f_url_res').css('color', 'var(--bad)').text('✗ 检查失败'); return false; });
+		}
+
+		/* 一键自检 */
+		var DGICO = { ok: '✅', warn: '🟡', bad: '🔴', off: '⚪' }, DGFIX = { goSub: '去添加订阅', start: '启动', update: '更新订阅', test: '测速', best: '切到最快节点', restart: '重新启动', takeover: '开启透明代理' };
+		$('#cx_diag').on('click', function () {
+			$('#dg_sum').text('正在检查…'); $('#dg_list').empty(); $('#cx_mask, #cx_dg').show(); KelUI.place('#cx_dg');
+			ubus('web_clash_diagnose', { client_mac: myMac }).then(function (r) {
+				$('#dg_sum').text(r.summary === 'ok' ? '一切正常 👍' : r.summary === 'warn' ? '基本正常，有需要注意的地方' : '发现问题，按下面的建议处理');
+				var html = '';
+				(r.items || []).forEach(function (it) {
+					html += '<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px dashed #eceef3"><span>' + (DGICO[it.state] || '') + '</span><div style="flex:1"><b>' + esc(it.title) + '</b><div class="cx-help" style="margin:2px 0 0">' + esc(it.msg) + '</div></div>' + (DGFIX[it.fix] ? '<span class="cx-btn sm" data-fix="' + it.fix + '">' + DGFIX[it.fix] + '</span>' : '') + '</div>';
+				});
+				$('#dg_list').html(html);
+			}, function () { $('#dg_sum').text('自检失败，请稍后重试'); });
+		});
+		$('#dg_list').on('click', '[data-fix]', function () {
+			var f = $(this).data('fix'); closeModal();
+			if (f === 'goSub') act('goSettings'); else if (f === 'start') act('start'); else if (f === 'restart') act('restart'); else if (f === 'takeover') act('takeover');
+			else if (f === 'update') { goTab('nodes'); $('#n_update').click(); } else if (f === 'test') { goTab('nodes'); testAll(); } else if (f === 'best') $('#n_best').click();
+		});
+		$('#n_best').on('click', function () {
+			ubus('web_clash_best', { target: 'sub' }).then(function (r) { toast(r.status === 0 ? '已切换到最快节点：' + r.name + '（' + r.delay + ' ms）' : r.status === 1 ? '内核未运行' : '暂时没有测通的节点，请先点「测速全部节点」', r.status === 0); nodesSig = ''; refresh(); });
+		});
+		$('#f_asw').on('click', 'span', function () { save({ auto_switch: String($(this).data('v')) }); });
+		$('#rs_update').on('click', function () {
+			var b = $(this), t0 = (st && st.ruleset_at) || 0; if (b.hasClass('dis')) return; b.addClass('dis').text('更新中…（约半分钟）');
+			ubus('web_clash_rules_update', { target: 'sub' }).then(function (r) {
+				if (r.status !== 0) { toast('内核未运行'); b.removeClass('dis').text('立即更新'); return; }
+				var n = 0; (function poll() { refresh().then(function () { if ((st.ruleset_at || 0) > t0 || ++n > 30) { b.removeClass('dis').text('立即更新'); toast((st.ruleset_at || 0) > t0 ? '分流规则已更新' : '更新超时，稍后自动重试', (st.ruleset_at || 0) > t0); } else setTimeout(poll, 2500); }); })();
+			}, function () { b.removeClass('dis').text('立即更新'); toast('更新失败'); });
+		});
+		$('#f_url').on('input', function () { dirty.url = true; $('#f_url_dirty').show(); $('#f_url_res').text(''); });
+		$('#f_ua_sel').on('change', function () { var c = this.value === 'c'; $('#f_ua').toggle(c); if (c) $('#f_ua').focus(); uaTouch(); });
+		$('#f_ua').on('input', uaTouch);
+		$('#f_rules').on('input', function () { dirty.rules = true; $('#f_rules_dirty').show(); });
+
+
+		/* ================= 实时数据：流量图 / 连接 / 日志 / 规则 ================= */
+		function fmtB(n) { n = +n || 0; if (n < 1024) return Math.round(n) + ' B'; if (n < 1048576) return (n / 1024).toFixed(1) + ' KB'; if (n < 1073741824) return (n / 1048576).toFixed(1) + ' MB'; return (n / 1073741824).toFixed(2) + ' GB'; }
+		function fmtS(n) { return fmtB(n) + '/s'; }
+		function fmtDur(iso) { var t = Date.parse(iso); if (!t) return '—'; var s = Math.max(0, Math.round((Date.now() - t) / 1000)); if (s < 60) return s + ' 秒'; if (s < 3600) return Math.floor(s / 60) + ' 分'; return Math.floor(s / 3600) + ' 时 ' + Math.floor(s % 3600 / 60) + ' 分'; }
+		function hhmmss(iso) { var d = iso ? new Date(iso) : null; if (!d || isNaN(d)) return ''; function z(x) { return (x < 10 ? '0' : '') + x; } return z(d.getHours()) + ':' + z(d.getMinutes()) + ':' + z(d.getSeconds()); }
+
+		var hist = [], lastTot = null, busy = {}, connRows = [], connDev = {}, logRows = [], logCutT = '', logPause = false, connSort = 'flow', logLv = 'all';
+		var HMAX = 90;
+
+		function drawChart() {
+			var cv = document.getElementById('lv_chart'); if (!cv || !cv.getContext) return;
+			var w = cv.width = cv.clientWidth * 2 || 900, h = cv.height = 300, g = cv.getContext('2d'); g.clearRect(0, 0, w, h);
+			var max = 1024; hist.forEach(function (x) { max = Math.max(max, x.up, x.dn); });
+			var step = Math.pow(10, Math.floor(Math.log10(max))); max = Math.ceil(max / step) * step;
+			g.strokeStyle = '#eceef3'; g.lineWidth = 1; g.fillStyle = '#9aa0b0'; g.font = '20px sans-serif';
+			for (var i = 0; i <= 3; i++) { var y = 10 + (h - 30) * i / 3; g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); if (i < 3) g.fillText(fmtS(max * (3 - i) / 3), 6, y + 20); }
+			function line(key, col, fill) {
+				if (hist.length < 2) return; g.beginPath();
+				hist.forEach(function (x, i) { var px = w * (i + (HMAX - hist.length)) / (HMAX - 1), py = 10 + (h - 30) * (1 - x[key] / max); i ? g.lineTo(px, py) : g.moveTo(px, py); });
+				g.strokeStyle = col; g.lineWidth = 3; g.stroke();
+				g.lineTo(w, h - 20); g.lineTo(w * (HMAX - hist.length) / (HMAX - 1), h - 20); g.closePath(); g.fillStyle = fill; g.fill();
+			}
+			line('dn', '#4762FE', 'rgba(71,98,254,.12)'); line('up', '#22b573', 'rgba(34,181,115,.14)');
+		}
+		function feedLive(r) {
+			var now = Date.now(), up = 0, dn = 0;
+			if (lastTot && r.up_total >= lastTot.u && r.down_total >= lastTot.d) { var dt = (now - lastTot.t) / 1000 || 1; up = (r.up_total - lastTot.u) / dt; dn = (r.down_total - lastTot.d) / dt; }
+			lastTot = { t: now, u: r.up_total, d: r.down_total };
+			hist.push({ up: up, dn: dn }); if (hist.length > HMAX) hist.shift();
+			$('#lv_up').text(fmtS(up)); $('#lv_dn').text(fmtS(dn));
+			$('#lv_tot').html('累计 ↑ ' + fmtB(r.up_total) + '　↓ ' + fmtB(r.down_total));
+			$('#lv_hint').text('每 3 秒刷新 · 统计自内核启动'); $('#kv_conn').text(r.count + ' 条'); $('#kv_mem').text(fmtB(r.mem));
+			drawChart();
+		}
+		function resetLive() { hist = []; lastTot = null; $('#lv_up, #lv_dn').text('—'); $('#lv_tot').text('累计 —'); $('#lv_hint').text('内核运行后显示'); $('#kv_conn, #kv_mem').text('—'); drawChart(); }
+
+		/* ---------- 代理流量统计 ---------- */
+		var statRange = 'today';
+		function renderStats(r) {
+			if (!r || r.empty) {
+				$('#st_dn, #st_up, #st_sum').text('—'); $('#st_share').text('');
+				$('#st_hint').text('开启透明代理并运行一段时间后开始统计'); $('#st_bars').empty(); $('#st_a0, #st_a1').text('');
+				$('#st_dev').html('<tr><td colspan="4" class="cx-empty">暂无数据</td></tr>'); return;
+			}
+			var s = r.sum, p = s.pu + s.pd, all = p + s.du + s.dd;
+			$('#st_dn').text(fmtB(s.pd)); $('#st_up').text(fmtB(s.pu)); $('#st_sum').text(fmtB(p));
+			$('#st_share').text(all > 0 ? '占经过内核流量的 ' + Math.round(p * 100 / all) + '%' : '');
+			$('#st_hint').text('走了代理节点的流量；直连和国内站点不计入。每 2 秒采样，总量精确，设备占比为估算');
+			var max = 1; $.each(r.days, function (_, d) { max = Math.max(max, d.pu + d.pd); });
+			var bars = '';
+			$.each(r.days, function (i, d) {
+				var v = d.pu + d.pd, h = v ? Math.max(3, Math.round(v * 86 / max)) : 0, y = String(d.d).replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
+				bars += '<i class="' + (v ? (i === r.days.length - 1 ? 't' : '') : 'z') + '" style="height:' + h + 'px" title="' + y + '　↓ ' + fmtB(d.pd) + '　↑ ' + fmtB(d.pu) + '"></i>';
+			});
+			$('#st_bars').html(bars);
+			var f = r.days[0].d, l = r.days[r.days.length - 1].d;
+			$('#st_a0').text(f.slice(4, 6) + '-' + f.slice(6)); $('#st_a1').text(l.slice(4, 6) + '-' + l.slice(6));
+			var rows = '', top = 1; $.each(r.devices, function (_, d) { top = Math.max(top, d.up + d.down); });
+			$.each(r.devices, function (_, d) {
+				var v = d.up + d.down;
+				rows += '<tr><td>' + esc(d.name) + '</td><td style="text-align:right">' + fmtB(d.down) + '</td><td style="text-align:right">' + fmtB(d.up) + '</td><td><div class="st-pct"><b style="width:' + Math.round(v * 100 / top) + '%"></b></div></td></tr>';
+			});
+			$('#st_dev').html(rows || '<tr><td colspan="4" class="cx-empty">这个时间段内没有走代理的流量</td></tr>');
+		}
+		function loadStats() { return ubus('web_get_clash_stats', { range: statRange }).then(renderStats); }
+		$('#st_range').on('click', 'span', function () { statRange = String($(this).data('v')); $('#st_range span').removeClass('on'); $(this).addClass('on'); loadStats(); });
+
+		function esc2(x) { return esc(x); }
+		function renderConns() {
+			var q = $.trim($('#c_q').val()).toLowerCase(), rows = connRows.slice();
+			if (q) rows = rows.filter(function (c) { return (c.host + ' ' + c.src + ' ' + (connDev[c.src] || '') + ' ' + c.rule + ' ' + c.node).toLowerCase().indexOf(q) >= 0; });
+			if (connSort === 'new') rows.sort(function (a, b) { return Date.parse(b.start) - Date.parse(a.start); });
+			$('#c_sum').text(connRows.length + ' 条活动连接' + (q ? '，匹配 ' + rows.length : ''));
+			if (!rows.length) { $('#c_body').html('<tr><td colspan="7" style="text-align:center;padding:46px 0;color:var(--mute)">' + (st && st.core === 'running' ? '目前没有连接。<br>设备使用代理口 ' + esc2(st.lan_ip || '') + ':7890，或开启「透明代理」后，连接会出现在这里。' : '内核未运行') + '</td></tr>'); return; }
+			/* 默认只列前 30 条（按当前排序）：全家设备常有上百条连接，全部铺开页面有几屏长，找不到重点 */
+			var total = rows.length; if (!connAll && !q) rows = rows.slice(0, 30);
+			var html = '';
+			rows.forEach(function (c) {
+				var pol = c.node === 'DIRECT' ? 'd' : /REJECT/.test(c.node) ? 'r' : 'p';
+				html += '<tr><td><div class="h" title="' + esc2(c.host) + '">' + esc2(c.host) + '</div><div class="g">' + esc2(c.dst) + ' · ' + esc2((c.net || '').toUpperCase()) + '</div></td>' +
+					'<td>' + esc2(connDev[c.src] || c.src) + (connDev[c.src] ? '<div class="g">' + esc2(c.src) + '</div>' : '') + '</td>' +
+					'<td class="e" title="' + esc2(c.rule) + '">' + esc2(c.rule) + '</td><td><span class="cx-tag2 ' + pol + ' e" title="' + esc2(c.node) + '">' + esc2(c.node) + '</span></td>' +
+					'<td style="white-space:nowrap">↑ ' + fmtB(c.up) + '<div class="g">↓ ' + fmtB(c.down) + '</div></td><td style="white-space:nowrap">' + fmtDur(c.start) + '</td><td><span class="x" data-id="' + esc2(c.id) + '">断开</span></td></tr>';
+			});
+			if (total > rows.length) html += '<tr><td colspan="7" style="text-align:center;padding:14px 0"><span class="cx-btn sm" id="c_more">显示全部 ' + total + ' 条</span></td></tr>';
+			$('#c_body').html(html);
+		}
+		var connAll = false;
+		$('#c_body').on('click', '#c_more', function () { connAll = true; renderConns(); });
+		function renderLogs() {
+			var q = $.trim($('#l_q').val()).toLowerCase(), box = $('#l_box'), el = box[0], stick = !logPause;
+			var LV = { info: '信息', warning: '警告', warn: '警告', error: '错误', debug: '调试' }, html = '';
+			logRows.forEach(function (x, i) {
+				if (logCutT && x.t <= logCutT) return; if (logLv !== 'all' && x.l !== logLv) return; if (q && (x.m + x.l).toLowerCase().indexOf(q) < 0) return;
+				html += '<div><span class="t">' + esc2(hhmmss(x.t)) + '</span><span class="l ' + esc2(x.l) + '">' + esc2(LV[x.l] || x.l) + '</span>' + esc2(x.m) + '</div>';
+			});
+			box.html(html || '<div style="color:#7c8299;padding:20px 0;text-align:center">' + (st && st.core === 'running' ? '暂无日志' : '内核未运行') + '</div>');
+			if (stick) el.scrollTop = el.scrollHeight;
+		}
+		var EVICO = { switch: '🔀', switch_freeze: '⏸', fallback: '🟡', recover: '🟢', takeover_on: '🟢', takeover_off: '⚪', engine_start: '🚀', engine_fail: '🔴', info: '·' };
+		var EVTOAST = { switch: 1, switch_freeze: 1, fallback: 1, recover: 1, takeover_on: 1, takeover_off: 1, engine_fail: 1 };
+		function renderEvents(list) {
+			list = list || [];
+			/* 后台自动做了什么，页面立刻跟上：有新的重要事件就提示并刷新状态（前后端一致） */
+			var top = list.length ? list[list.length - 1].t : 0;
+			if (evInit && top > lastEv) list.forEach(function (e) { if (e.t > lastEv && EVTOAST[e.k]) toast(e.m, e.k !== 'engine_fail' && e.k !== 'fallback'); });
+			if (top > lastEv) { if (evInit) { nodesSig = ''; refresh(); } lastEv = top; }
+			evInit = true;
+			if (!list.length) { $('#ev_list').html('<div style="color:var(--mute)">暂无事件</div>'); return; }
+			var html = '';
+			list.slice(-10).reverse().forEach(function (e) { var d = new Date(e.t * 1000); function z(x) { return (x < 10 ? '0' : '') + x; } html += '<div><span class="t">' + z(d.getHours()) + ':' + z(d.getMinutes()) + ':' + z(d.getSeconds()) + '</span><span>' + (EVICO[e.k] || '·') + ' ' + esc2(e.m) + '</span></div>'; });
+			$('#ev_list').html(html);
+		}
+		function renderRules(rules) {
+			if (!rules || !rules.length) { $('#r_body').html('<tr><td colspan="5" class="g" style="text-align:center;padding:24px">内核运行后显示</td></tr>'); return; }
+			var html = '';
+			rules.forEach(function (r, i) {
+				var pol = r.proxy === 'DIRECT' ? 'd' : r.proxy === 'REJECT' ? 'r' : 'p';
+				html += '<tr><td class="g">' + (i + 1) + '</td><td>' + esc2(r.type) + '</td><td>' + (esc2(r.payload) || '<span class="g">—（其余全部）</span>') + '</td><td><span class="cx-tag2 ' + pol + '">' + esc2(r.proxy) + '</span></td><td>' + (r.hits || 0) + '</td></tr>';
+			});
+			$('#r_body').html(html);
+		}
+
+		/* 按当前页签轮询：只在可见、内核运行、上一次请求已返回时才请求，避免堆积 */
+		function once(key, fn) { if (busy[key]) return; busy[key] = 1; fn().always(function () { busy[key] = 0; }); }
+		function pollNow() {
+			if (curTab === 'traffic' && !document.hidden) once('stats', loadStats);
+			if (document.hidden || !st || st.core !== 'running') { if (curTab === 'conns') renderConns(); if (curTab === 'logs') renderLogs(); return; }
+			if (curTab === 'traffic') once('live', function () { return ubus('web_clash_live', { list: '0' }).then(feedLive); });
+			if (curTab === 'set' || curTab === 'overview') { once('ev', function () { return ubus('web_clash_events').then(function (r) { renderEvents(r.events); }); }); }
+			else if (curTab === 'conns') once('conns', function () { return ubus('web_clash_live', { list: '1' }).then(function (r) { feedLive(r); connRows = r.conns || []; connDev = r.devices || {}; renderConns(); }); });
+			else if (curTab === 'logs') once('logs', function () { return ubus('web_clash_logs').then(function (r) { logRows = r.lines || []; renderLogs(); }); });
+			else if (curTab === 'rules') once('rules', function () { return ubus('web_clash_rules').then(function (r) { renderRules(r.rules); }); });
+		}
+		function afterRender() { if (st && st.core !== 'running') { resetLive(); connRows = []; } }
+		setInterval(pollNow, 3000);
+
+		$('#c_q').on('input', renderConns);
+		$('#c_sort').on('click', 'span', function () { connSort = $(this).data('k'); $('#c_sort span').removeClass('on'); $(this).addClass('on'); renderConns(); });
+		$('#c_body').on('click', '.x', function () { var id = $(this).data('id'); ubus('web_clash_conn_close', { id: String(id) }).then(function () { connRows = connRows.filter(function (c) { return c.id !== id; }); renderConns(); pollNow(); }); });
+		$('#c_closeall').on('click', function () { if (!connRows.length) return; if (!confirm('断开全部 ' + connRows.length + ' 条连接？正在下载/播放的会短暂中断并自动重连。')) return; ubus('web_clash_conn_close', { id: 'all' }).then(function () { connRows = []; renderConns(); toast('已断开全部连接', true); }); });
+		$('#l_lv').on('click', 'span', function () { logLv = $(this).data('v'); $('#l_lv span').removeClass('on'); $(this).addClass('on'); renderLogs(); });
+		$('#l_q').on('input', renderLogs);
+		$('#l_pause').on('click', function () { logPause = !logPause; $(this).text(logPause ? '恢复滚动' : '暂停滚动').toggleClass('pri', logPause); });
+		$('#l_clear').on('click', function () { if (logRows.length) logCutT = logRows[logRows.length - 1].t; renderLogs(); });
+		$(window).on('resize', drawChart);
+
+		$.ajax({ url: '/cgi-bin/get_clientmac.cgi', type: 'POST', dataType: 'text' }).done(function (t) { myMac = $.trim(t || ''); });
+		refresh();
+		var saved = store('cx_tab'); if (saved && $('#p_' + saved).length) goTab(saved);
+		setInterval(function () { if (!document.hidden) refresh(); }, 4000);
+	});
+	</script>
+</body>
+</html>

@@ -1,0 +1,135 @@
+.content{padding: 29px 120px 0 120px;text-align: center;background: #FFFFFF;border-radius: 10px;height: 292px}
+.footInfo{height: 60px;width: 100%;background-color: white; margin-top: 12px; margin-bottom: 5px; border-radius: 10px;text-align: center;font-size: 14px; color: rgb(204, 204, 204);line-height: 60px;}
+.lianjie{list-style: none;float: left;height:180px;line-height: 180px}
+.success span{width: 78px;border-bottom: 2px solid #0DD852;display: inline-block;}
+.fild span{width: 78px;border-bottom: 2px solid #E1251B;display: inline-block;}
+/* .fild_img{width: 24px;height: 24px} */
+.link_num{width: 46px;display: inline-block;line-height: 30px;background-color: #F4F6FA;border-radius: 100px;color: #4762FE;font-size: 16px;}
+
+.status{margin-top: 10px;width: 100%;height: 362px;}
+.status_left{width: calc(50% - 6px);height: 362px;float: left;background-color: #fff;border-radius: 10px;padding: 0 40px 40px 40px}
+.status_head{width: 100%;margin-bottom: 0;border-bottom: 1px solid #eee;height: 75px;font-weight: 550;padding-top:30px;font-size: 18px;text-align: left;}
+.click{background-color: #fff;color: #333333!important;}
+
+
+.display{display: none}
+i{font-style: normal;}
+.wifiInfoDiv{
+    position: absolute;
+    top: 5px;
+    left: 180px;
+    background-color: white;
+    width: 200px;
+    box-shadow: 0 0 2px #5F76FF;
+    border-radius: 5px;
+    padding: 16px 18px;
+    display: none;
+    z-index: 10;
+}
+.sanjiaox {
+    position: absolute;
+    display: inline-block;
+    top: 81px;
+    left: -6px;
+    width: 0;
+    height: 0px;
+    content: '';
+    border-style: solid;
+    border-width: 6px;
+    border-color: #fff #fff transparent transparent;
+    transform: rotate(224deg);
+    box-shadow: 0px 0px 2px #5F76FF;
+}
+.wifiInfoDiv::after{
+    content: "";
+    position: absolute;
+    top: 75px;
+    left: 0px;
+    border-bottom: 12px solid transparent;
+    border-top: 12px solid transparent;
+    border-left: 12px solid white;
+    border-right: 0;
+}
+.top::after{
+    top: 82px!important;
+}
+.lableWifiInfo{
+    width: 48%;
+    float: left;
+    text-align: left;
+    color: rgb(204, 204, 204);
+    font-size: 12px;
+    height: 20px;
+    line-height: 20px;
+    margin-bottom: 0;
+    font-weight: 500;
+}
+.spanWifiInfo{
+    width: 52%;
+    text-align: left;
+    color: #333;
+    font-size: 12px;
+    display: inline-block;
+    vertical-align: top;
+    height: 20px;
+    line-height: 20px;
+    font-weight: 600;
+}
+.margin2Div{
+    margin: 2px 0;
+}
+.apMode{
+    display: none;
+    margin: 0;
+    line-height: 20px;
+    position: absolute;
+    top: 100px;
+    left: 54px;
+    font-size: 14px;
+    color: rgb(204, 204, 204);
+}
+#wifiInfoShow{
+    /* height:180px; */
+    max-width: 100%;
+    max-height: 100%;
+    display: block;
+    margin: auto;
+}
+.no_storage_2,
+.wifi_info,
+.http_link_desc,
+.dns-addr1,
+.dns-addr2 {
+    display: none;
+}
+.wifi_info {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    height: 28px;
+    line-height: 28px;
+    padding: 0 20px;
+    box-sizing: border-box;
+    border-radius: 100px;
+    background: #F4F6FA;
+}
+.wifi_info span {
+    font-weight: 400;
+    font-size: 12px;
+    color: #4762FE;
+}
+.wifi_info span:nth-child(2) {
+    margin: 0 10px;
+    color: #999;
+}
+/* 首页「存储状态」卡（2026-10-30）：版式、颜色取自原厂首页右侧的存储卡；本机没有 SD 卡，两个标签改为 内存 / 闪存 */
+.status_right{width: calc(50% - 6px);height: 362px;float: left;margin-left: 12px;background-color: #fff;border-radius: 10px;padding: 0 40px 40px 40px}
+.status_head span{font-family: PingFang SC;font-style: normal;font-weight: normal;font-size: 14px;line-height: 26px;color: #999999;margin-left: 4px;}
+.status_span_box{font-weight: normal;width: 157px;height: 30px;display: inline-block;float: right;background-color: #EEEEEE;border-radius: 3px}
+.status_span{color:#666666;cursor:pointer;width: 72px;height: 26px;line-height: 29px;display: inline-block;float: left;font-size: 14px;text-align: center;margin: 2px 1px 2px 1px;border-radius: 3px}
+.kel-st-note{height: 20px;margin-top: 12px;color: #999999;font-size: 14px;line-height: 20px;}
+#kel_st_ec{width: 120px;height: 120px;margin: 0 auto;margin-top: 35px;}
+.zong{margin-top: 55px;text-align: left;}
+.yiyong{margin-top: 2px;text-align: left;}
+.total_logo{width: 10px;height: 10px;border-radius: 50%;background-color: #3141FE;display: inline-block;margin-right: 17px}
+.used_logo{width: 10px;height: 10px;border-radius: 50%;background-color: #00DCF0;display: inline-block;margin-right: 17px}

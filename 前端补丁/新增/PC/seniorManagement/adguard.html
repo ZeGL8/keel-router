@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0,maximum-scale=1.0, user-scalable=no" />
+	<meta http-equiv="pragma" content="no-cache">
+	<meta http-equiv="cache-control" content="no-cache">
+	<meta http-equiv="expires" content="0">
+	<title>广告过滤</title>
+	<link href="../../P_IMG/icon.png" rel="icon" type="image/x-icon" />
+	<link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css">
+	<link rel="stylesheet" href="../css/seniorManagement_common.css?v=20260928a">
+	<link rel="stylesheet" href="../css/kel-app.css?v=20261006a">
+	<script type="text/javascript" src="../../Public_JS/jquery.min.js"></script>
+	<script type="text/javascript" src="../../Public_JS/jquery.cookie.js"></script>
+	<script type="text/javascript" src="../../Public_JS/iframe_height.js"></script>
+	<script type="text/javascript" src="../../Public_JS/kel-ui.js?v=20261006a"></script>
+	<style>
+		/* 广告过滤（AdGuardHome 引擎，界面自己重写）。样式主体在 kel-app.css，这里只放本页特有的 */
+		.ag-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+		.ag-stat { border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; background: #fff; }
+		.ag-stat .k { font-size: 12px; color: var(--mute); }
+		.ag-stat .v { margin-top: 6px; font-size: 24px; font-weight: 600; }
+		.ag-stat .v small { font-size: 12px; font-weight: 400; color: var(--mute); margin-left: 4px; }
+		.ag-stat.bad .v { color: var(--bad); }
+		.ag-two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+		.ag-list > div { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px dashed #eceef3; font-size: 13px; line-height: 20px; }
+		.ag-list > div:last-child { border-bottom: 0; }
+		.ag-list .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+		.ag-list .ct { flex: none; color: var(--mute); font-variant-numeric: tabular-nums; }
+		.ag-list .go { flex: none; color: var(--pri); cursor: pointer; font-size: 12px; } .ag-list .go:hover { text-decoration: underline; }
+		.ag-bar { height: 6px; border-radius: 3px; background: #eef0f5; margin-top: 4px; overflow: hidden; } .ag-bar b { display: block; height: 100%; background: var(--pri); }
+		.ag-sw { flex: none; position: relative; width: 40px; height: 22px; border-radius: 11px; background: #c9cdd8; cursor: pointer; transition: background .15s; }
+		.ag-sw:after { content: ''; position: absolute; left: 2px; top: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .15s; }
+		.ag-sw.on { background: var(--pri); } .ag-sw.on:after { left: 20px; }
+		.ag-flt > div { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid #f0f1f5; }
+		.ag-flt > div:last-child { border-bottom: 0; }
+		.ag-flt .info { flex: 1; min-width: 0; } .ag-flt .info b { font-weight: 500; }
+		.ag-flt .info .s { color: var(--mute); font-size: 12px; margin-top: 2px; word-break: break-all; }
+		.ag-flt .x { color: var(--bad); cursor: pointer; font-size: 13px; white-space: nowrap; } .ag-flt .x:hover { text-decoration: underline; }
+		.ag-rec { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+		.ag-rec > div { flex: 1; min-width: 200px; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+		.ag-rec .t { font-weight: 600; } .ag-rec .d { color: var(--mute); font-size: 12px; line-height: 18px; margin: 4px 0 10px; }
+		.ag-tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 4px; background: #f0f1f6; color: #666; }
+		.ag-tag.b { background: var(--bad-bg); color: var(--bad); } .ag-tag.a { background: var(--ok-bg); color: #178a58; }
+		.ag-chk { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+		.ag-chk input { flex: 1; min-width: 220px; }
+		.ag-res { margin-top: 12px; padding: 12px 14px; border-radius: 8px; background: #f6f7fb; line-height: 22px; display: none; }
+		@media (max-width: 860px) { .ag-stats { grid-template-columns: repeat(2, 1fr); } .ag-two { grid-template-columns: 1fr; } }
+	</style>
+</head>
+<body>
+	<div class="seniorManagement_Box">
+		<div class="seniorManagement_content cx" style="margin:0">
+			<div class="cx-head">
+				<div><h2>广告过滤</h2><p class="sub">拦截网页、App 里的广告和跟踪域名 · 全家设备无需安装任何东西 · 基于 AdGuard Home 引擎，只在路由器内存中运行</p></div>
+				<div style="display:flex;align-items:center;gap:12px"><span class="cx-btn sm" id="ag_diag">🔍 一键自检</span><span class="cx-chip" id="ag_chip"><i></i><span>读取中…</span></span></div>
+			</div>
+			<div class="cx-tabs" id="ag_tabs">
+				<div class="cx-tab on" data-t="overview">概览</div>
+				<div class="cx-tab" data-t="rules">规则</div>
+				<div class="cx-tab" data-t="log">查询记录</div>
+				<div class="cx-tab" data-t="settings">设置</div>
+			</div>
+
+			<!-- ① 概览 -->
+			<div class="cx-pane on" id="p_overview">
+				<div class="cx-alert" id="ag_alert"></div>
+				<div class="cx-card cx-hero" id="ag_hero">
+					<div class="ico" id="hero_ico">🛡️</div>
+					<div class="body"><div class="t" id="hero_t">—</div><div class="d" id="hero_d"></div><div class="bar" id="hero_bar" style="display:none"><b style="width:0"></b></div></div>
+					<span class="cx-btn" id="hero_pause" style="display:none">暂停过滤</span>
+					<span class="cx-btn pri" id="hero_btn" style="display:none"></span>
+				</div>
+				<div id="ag_dash" style="display:none">
+					<div class="ag-stats">
+						<div class="ag-stat bad"><div class="k">已拦截</div><div class="v" id="st_blocked">—</div></div>
+						<div class="ag-stat"><div class="k">域名查询总数</div><div class="v" id="st_total">—</div></div>
+						<div class="ag-stat"><div class="k">拦截比例</div><div class="v" id="st_ratio">—</div></div>
+						<div class="ag-stat"><div class="k">平均响应</div><div class="v" id="st_avg">—</div></div>
+					</div>
+					<div class="cx-card">
+						<h3>最近 24 小时<small>每小时的查询数与拦截数</small></h3>
+						<canvas id="ag_chart" width="900" height="150" style="width:100%;height:150px;display:block"></canvas>
+						<div class="cx-legend"><span><i style="background:#c9d3ff"></i>全部查询</span><span><i style="background:#f04a45"></i>被拦截</span></div>
+					</div>
+					<div class="ag-two">
+						<div class="cx-card"><h3>被拦截最多的网站<small>点「放行」可以恢复访问</small></h3><div class="ag-list" id="top_blocked"></div></div>
+						<div class="cx-card"><h3>最活跃的设备</h3><div class="ag-list" id="top_clients"></div></div>
+					</div>
+				</div>
+				<div class="cx-card" id="ag_intro" style="display:none">
+					<h3>它能帮你做什么</h3>
+					<div class="cx-help" style="font-size:14px;line-height:26px">
+						· 手机、电脑、电视上的网页广告、App 开屏广告里的一部分、各种跟踪统计，在「连上网站之前」就被拦掉。<br>
+						· 不用在每台设备上装软件，全家设备一起生效；哪台设备要放行，也可以单独处理。<br>
+						· 只拦「域名」：和正文同一个域名的广告拦不掉，视频前贴片广告大多也不行——这是这种方式的特点，不是出错了。<br>
+						· 出任何问题都自动恢复成路由器原来的解析，不会影响上网。首次开启要下载约 11MB 的引擎，之后每次开机自动准备（约 1 分钟，期间上网不受影响）。
+					</div>
+				</div>
+				<div class="cx-card">
+					<h3>最近事件<small>后台的自动动作：开启、暂停、恢复……方便知道发生了什么</small></h3>
+					<div class="cx-ev" id="ev_list"><div style="color:var(--mute)">暂无事件</div></div>
+				</div>
+			</div>
+
+			<!-- ② 规则 -->
+			<div class="cx-pane" id="p_rules">
+				<div class="cx-card">
+					<h3>过滤规则订阅<small id="rl_meta">由社区维护，引擎每天自动更新</small></h3>
+					<div class="ag-flt" id="flt_list"><div style="color:var(--mute);padding:14px 0">引擎运行后显示</div></div>
+					<div class="cx-actions"><span class="cx-btn sm pri" id="flt_refresh">立即更新全部</span></div>
+				</div>
+				<div class="cx-card">
+					<h3>添加订阅<small>支持 AdGuard / ABP 规则、hosts、纯域名列表</small></h3>
+					<div class="ag-rec" id="rec_list"></div>
+					<div class="cx-help" style="margin-top:14px">或者粘贴任意规则订阅链接：</div>
+					<div class="cx-field" style="margin-top:6px"><input type="text" id="flt_name" placeholder="名字（可不填）" autocomplete="off" style="margin-bottom:8px"><input type="text" id="flt_url" placeholder="https://… 规则订阅链接" autocomplete="off"></div>
+					<div class="cx-actions"><span class="cx-btn pri" id="flt_add">添加</span><span class="cx-help" id="flt_res" style="margin:0"></span></div>
+				</div>
+				<div class="cx-card">
+					<h3>检查某个网站<small>被拦了？没被拦？看看是哪条规则起的作用</small></h3>
+					<div class="ag-chk"><div class="cx-field" style="flex:1"><input type="text" id="ck_domain" placeholder="例如 ads.example.com" autocomplete="off"></div><span class="cx-btn" id="ck_go">检查</span></div>
+					<div class="ag-res" id="ck_res"></div>
+				</div>
+				<div class="cx-card">
+					<h3>自定义规则<small>优先于订阅，保存后几秒到半分钟内生效</small><small id="ur_dirty" style="display:none;color:var(--warn)">● 有未保存的修改</small></h3>
+					<div class="cx-field"><textarea id="ur_text" placeholder="# 每行一条，例如：&#10;||ads.example.com^        拦截这个网站（含子域名）&#10;@@||news.example.com^      放行这个网站"></textarea>
+						<div class="cx-help"><b>||域名^</b> 拦截该域名及其子域名；<b>@@||域名^</b> 放行（比拦截优先）。以 # 或 ! 开头的是注释。「被拦最多的网站」和「查询记录」里点「放行」，实际就是自动帮你加一条放行规则。</div></div>
+					<div class="cx-actions"><span class="cx-btn pri" id="ur_save">保存规则</span></div>
+				</div>
+			</div>
+
+			<!-- ③ 查询记录 -->
+			<div class="cx-pane" id="p_log">
+				<div class="cx-bar">
+					<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+						<input class="cx-search" id="q_text" placeholder="搜索 网站 / 设备地址" autocomplete="off">
+						<div class="cx-seg" id="q_mode"><span data-v="0" class="on">全部</span><span data-v="1">仅被拦截</span></div>
+					</div>
+					<span id="q_sum" style="color:var(--mute);font-size:13px"></span>
+				</div>
+				<div class="cx-wrap"><table class="cx-table"><thead><tr><th>时间</th><th>网站</th><th>设备</th><th>结果</th><th>依据</th><th></th></tr></thead><tbody id="q_body"></tbody></table></div>
+			</div>
+
+			<!-- ④ 设置 -->
+			<div class="cx-pane" id="p_settings">
+				<div class="cx-card">
+					<h3>广告过滤</h3>
+					<div class="cx-seg" id="s_en"><span data-v="1">开启</span><span data-v="0">关闭</span></div>
+					<div class="cx-help">关闭后，路由器不再运行过滤引擎，所有设备的域名解析回到路由器自带的方式，就像没装过一样。</div>
+				</div>
+				<div class="cx-card">
+					<h3>强制全部设备使用<small>默认关闭</small></h3>
+					<div class="cx-seg" id="s_force"><span data-v="0">仅经过路由器的查询</span><span data-v="1">强制全部设备</span></div>
+					<div class="cx-help"><b>仅经过路由器的查询</b>：设备用路由器给的 DNS（绝大多数设备默认如此）就会被过滤。<br><b>强制全部设备</b>：有些设备或 App 自己写死了别的 DNS（如 8.8.8.8、223.5.5.5），会绕过过滤；打开后这类查询也会被拉回来。<span style="color:var(--warn)">如果设备用了加密 DNS（DoH/DoT），仍然无法拦截。</span></div>
+				</div>
+				<div class="cx-card">
+					<h3>运行情况</h3>
+					<div class="cx-kv">
+						<div><div class="k">过滤引擎版本</div><div class="v" id="i_ver">—</div></div>
+						<div><div class="k">规则总数</div><div class="v" id="i_rules">—</div></div>
+						<div><div class="k">规则更新周期</div><div class="v" id="i_iv">—</div></div>
+					</div>
+					<div class="cx-help" style="margin-top:14px">路由器自己的解析（上网、DHCP、设备名识别）始终由原来的 dnsmasq 负责，过滤引擎只是它前面的一层；引擎出问题时自动撤掉这一层。</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="cx-mask" id="cx_mask"></div>
+	<div class="cx-modal" id="cx_dg"><h4>一键自检</h4><div class="cx-lead" id="dg_sum">正在检查…</div><div id="dg_list"></div><div class="cx-ft"><span class="cx-btn pri" id="dg_close">知道了</span></div></div>
+
+	<script>
+	$(function () {
+		var sid = $.cookie('sessionid');
+		if (!sid) { top.location.href = 'http://' + location.host + '/index.html'; return; }
+		var st = null, curTab = 'overview', myMac = '', dirty = false, lastEv = 0, evInit = false, busy = {}, filtSig = '';
+		var MSG = { 0: '已保存', 1: '广告过滤引擎没有在运行', 2: '输入格式不对，请检查', 3: '广告过滤引擎没有在运行', 4: '引擎没有接受，请稍后重试', 5: '这份订阅已经添加过了' };
+		var REC = [
+			{ name: 'anti-AD（中文广告/跟踪，推荐）', url: 'https://anti-ad.net/adguard.txt', d: '专门针对国内网站和 App 的广告、跟踪，约 10 万条，覆盖面广。', size: '约 2 MB' },
+			{ name: 'HaGeZi Light（轻量补充）', url: 'https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/light.txt', d: '国际通用的精简广告与跟踪规则，误拦少，可以和上一份一起用。', size: '约 0.3 MB' },
+			{ name: 'AdGuard DNS 过滤（国际综合）', url: 'https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt', d: 'AdGuard 官方的综合规则，偏国际站点。规则较多，占内存略大。', size: '约 4 MB' }
+		];
+
+		/* -32002（Access denied）不一定是登录过期：后端正忙时网页服务器问不到会话权限也回这个。
+		   先隔 2.5 秒重试两次，仍然被拒才当成登录过期跳回登录页（被拒的请求没有执行过，重试是安全的）。 */
+		function ubus(method, args, _n) {
+			return $.ajax({ url: '/ubus', type: 'POST', dataType: 'json', contentType: 'application/json',
+				data: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'call', params: [sid, 'kelapi.static', method, args || {}] })
+			}).then(function (r) {
+				if (r.error && r.error.code == -32002) {
+					if ((_n || 0) < 2) { var d = $.Deferred(); setTimeout(function () { ubus(method, args, (_n || 0) + 1).then(d.resolve, d.reject); }, 2500); return d.promise(); }
+					top.location.href = 'http://' + location.host + '/index.html'; return $.Deferred().reject();
+				}
+				return (r.result && r.result[0] === 0) ? (r.result[1] || {}) : $.Deferred().reject();
+			});
+		}
+		function toast(msg, ok) { if (window.parent && window.parent.hintShaed) window.parent.hintShaed(msg, ok ? 'icon-duigouxuanzhong' : 'icon-gantanhao-yuankuang'); }
+		function esc(s) { return $('<div>').text(s == null ? '' : s).html(); }
+		function once(key, fn) { if (busy[key]) return; busy[key] = 1; fn().always(function () { busy[key] = 0; }); }
+		function fmtN(n) { n = +n || 0; return n >= 10000 ? (n / 10000).toFixed(1) + ' 万' : String(n); }
+		function pad(x) { return (x < 10 ? '0' : '') + x; }
+		function hhmmss(d) { return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()); }
+
+		/* ---------- 设置类保存：先取最新状态再合并，不用过期页面覆盖 ---------- */
+		function setAdg(patch, okMsg) {
+			return ubus('web_set_adg', patch).then(function (r) {
+				toast(r.status === 0 ? (okMsg || '已保存') : (MSG[r.status] || '设置失败'), r.status === 0);
+				refresh(); return r;
+			}, function () { toast('系统错误，请重新操作'); return { status: -1 }; });
+		}
+
+		/* ---------- 状态推导 ---------- */
+		function derive(d) {
+			var on = d.enabled === '1', run = d.core === 'running';
+			return { on: on, run: run, kind: !on ? 'off' : run ? 'run' : d.phase === 'failed' ? 'fail' : d.phase === 'downloading' ? 'dl' : 'boot' };
+		}
+		function renderHead(d, s) {
+			var chip = $('#ag_chip').attr('class', 'cx-chip'), t = '未开启';
+			if (s.kind === 'run') { if (!d.rules) { chip.addClass('wait'); t = '启动中'; } else if (!d.protection) { chip.addClass('wait'); t = '已暂停过滤'; } else { chip.addClass('ok'); t = '运行中 · 已生效'; } }
+			else if (s.kind === 'dl') { chip.addClass('wait'); t = '正在下载引擎'; }
+			else if (s.kind === 'boot') { chip.addClass('wait'); t = '启动中'; }
+			else if (s.kind === 'fail') { chip.addClass('bad'); t = '遇到问题'; }
+			chip.find('span').text(t);
+		}
+		function renderHero(d, s) {
+			var h = $('#ag_hero').attr('class', 'cx-card cx-hero'), ico = '🛡️', t, desc = '', btn = null, bar = null, pause = false;
+			var blocked = d.stats ? d.stats.blocked : 0;
+			if (s.kind === 'off') { t = '广告过滤没有开启'; desc = '开启后，全家设备访问网页和 App 时，广告与跟踪域名会被直接拦掉，不用在设备上做任何设置。'; btn = { txt: '开启广告过滤', act: 'start', pri: 1 }; }
+			else if (s.kind === 'dl') { h.addClass('wait'); ico = '⬇️'; t = '正在准备广告过滤引擎'; var m = /（(\d+)%）/.exec(d.phase_msg || ''); bar = m ? +m[1] : 0; desc = '引擎只放在内存里，首次要下载约 11MB。期间所有设备照常上网，不受影响。'; btn = { txt: '取消并关闭', act: 'stop' }; }
+			else if (s.kind === 'boot') { h.addClass('wait'); ico = '⏳'; t = '正在启动'; desc = '引擎启动后会先自检，确认可用才开始过滤；期间上网不受影响。'; }
+			else if (s.kind === 'fail') { h.addClass('bad'); ico = '⚠️'; t = '启动遇到问题'; desc = (d.phase_msg || '引擎没能正常启动') + '。已保持原来的解析方式，不影响上网。'; btn = { txt: '重新启动', act: 'restart', pri: 1 }; }
+			else if (!d.rules) { h.addClass('wait'); ico = '⏳'; t = '引擎已就绪，正在确认可用'; desc = d.health === 'probe-fail' ? '引擎暂时没有应答，为安全起见保持原来的解析方式，稍后自动重试。' : '确认通过后自动开始过滤，通常几秒钟。'; }
+			else if (!d.protection) { h.addClass('wait'); ico = '⏸️'; t = '过滤已暂停'; desc = '现在所有网站都不会被拦截；点「恢复过滤」重新开始。'; btn = { txt: '恢复过滤', act: 'resume', pri: 1 }; }
+			else { h.addClass('ok'); ico = '✅'; t = '广告过滤运行中'; desc = '全家设备的域名查询已经先经过广告过滤。今天已拦截 ' + fmtN(blocked) + ' 次。'; pause = true; }
+			$('#hero_ico').text(ico); $('#hero_t').text(t); $('#hero_d').text(desc);
+			if (bar !== null) $('#hero_bar').show().find('b').css('width', bar + '%'); else $('#hero_bar').hide();
+			$('#hero_pause').toggle(pause);
+			var b = $('#hero_btn'); if (btn) b.show().text(btn.txt).attr('class', 'cx-btn' + (btn.pri ? ' pri' : '')).data('act', btn.act); else b.hide();
+		}
+		function renderAlert(d, s) {
+			var a = $('#ag_alert').attr('class', 'cx-alert'), msg = '', cls = '';
+			if (s.on && !d.guard) { cls = 'bad'; msg = '⚠️ 广告过滤的守护程序没有运行（异常）。为安全起见，转发规则会被系统看门狗自动撤销，DNS 保持原样。点「重新启动」可恢复。'; }
+			else if (s.run && d.rules && d.health === 'probe-fail') { cls = 'wait'; msg = '🟡 引擎暂时没有应答，正在自动处理；处理期间会先恢复成路由器原来的解析。'; }
+			if (msg) a.addClass('on ' + cls).html(msg);
+		}
+
+		/* ---------- 概览：统计、图表、榜单 ---------- */
+		function drawChart(q, b) {
+			var cv = document.getElementById('ag_chart'); if (!cv || !cv.getContext) return;
+			var w = cv.width = (cv.clientWidth || 900) * 2, h = cv.height = 300, g = cv.getContext('2d'); g.clearRect(0, 0, w, h);
+			var n = q.length || 24, max = 10; q.forEach(function (x) { max = Math.max(max, x); });
+			var bw = w / n, gap = bw * 0.22;
+			g.strokeStyle = '#eceef3'; g.lineWidth = 1; g.fillStyle = '#9aa0b0'; g.font = '20px sans-serif';
+			for (var i = 0; i <= 3; i++) { var y = 10 + (h - 40) * i / 3; g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); if (i < 3) g.fillText(Math.round(max * (3 - i) / 3), 6, y + 20); }
+			for (var k = 0; k < n; k++) {
+				var hq = (h - 40) * (q[k] || 0) / max, hb = (h - 40) * ((b[k] || 0)) / max, x = k * bw + gap / 2;
+				g.fillStyle = '#c9d3ff'; g.fillRect(x, h - 30 - hq, bw - gap, hq);
+				g.fillStyle = '#f04a45'; g.fillRect(x, h - 30 - hb, bw - gap, hb);
+				if (k % 4 === 0) { var hr = new Date(Date.now() - (n - 1 - k) * 3600000).getHours(); g.fillStyle = '#9aa0b0'; g.fillText(pad(hr) + ':00', x, h - 6); }
+			}
+		}
+		function renderList(sel, list, allow) {
+			var box = $(sel), max = 1; list.forEach(function (x) { max = Math.max(max, x.count); });
+			if (!list.length) { box.html('<div style="color:var(--mute)">暂无数据</div>'); return; }
+			var html = '';
+			list.slice(0, 8).forEach(function (x) {
+				html += '<div><div class="nm" title="' + esc(x.key) + '">' + esc(x.name) + (x.name !== x.key && !allow ? '<div style="color:var(--mute);font-size:12px">' + esc(x.key) + '</div>' : '') + '<div class="ag-bar"><b style="width:' + Math.round(x.count * 100 / max) + '%"></b></div></div><span class="ct">' + fmtN(x.count) + '</span>' + (allow ? '<span class="go" data-allow="' + esc(x.key) + '">放行</span>' : '') + '</div>';
+			});
+			box.html(html);
+		}
+		function renderDash(d, s) {
+			var show = s.run && d.stats; $('#ag_dash').toggle(!!show); $('#ag_intro').toggle(!s.run);
+			if (!show) return;
+			var x = d.stats;
+			$('#st_blocked').text(fmtN(x.blocked)); $('#st_total').text(fmtN(x.queries));
+			$('#st_ratio').html(x.ratio + '<small>%</small>'); $('#st_avg').html(x.avg_ms + '<small>毫秒</small>');
+			drawChart(x.hourly || [], x.hourly_blocked || []);
+			renderList('#top_blocked', x.top_blocked || [], true); renderList('#top_clients', x.top_clients || [], false);
+		}
+
+		/* ---------- 规则页 ---------- */
+		function renderFilters(d, s) {
+			var box = $('#flt_list');
+			if (!s.run) { box.html('<div style="color:var(--mute);padding:14px 0">引擎运行后显示订阅列表。</div>'); filtSig = ''; return; }
+			var sig = JSON.stringify(d.filters); if (sig === filtSig) return; filtSig = sig;
+			if (!d.filters.length) { box.html('<div style="color:var(--mute);padding:14px 0">还没有订阅任何规则，什么都不会被拦。请在下面添加。</div>'); return; }
+			var html = '';
+			d.filters.forEach(function (f) {
+				var t = f.updated ? new Date(f.updated) : null, upd = t && !isNaN(t) && t.getFullYear() > 2000 ? '更新于 ' + t.toLocaleString() : '尚未下载';
+				html += '<div data-url="' + esc(f.url) + '"><div class="info"><b>' + esc(f.name) + '</b> <span class="ag-tag' + (f.rules ? ' a' : '') + '">' + fmtN(f.rules) + ' 条规则</span><div class="s">' + esc(upd) + ' · ' + esc(f.url) + '</div></div><div class="ag-sw' + (f.enabled ? ' on' : '') + '" data-toggle="1" title="启用/停用"></div><span class="x" data-del="1">删除</span></div>';
+			});
+			box.html(html);
+		}
+		function renderRec(d) {
+			var have = {}; (d.filters || []).forEach(function (f) { have[f.url] = 1; });
+			var html = '';
+			REC.forEach(function (r, i) { html += '<div><div class="t">' + esc(r.name) + '</div><div class="d">' + esc(r.d) + '（' + r.size + '）</div>' + (have[r.url] ? '<span class="ag-tag a">已添加</span>' : '<span class="cx-btn sm" data-rec="' + i + '">添加</span>') + '</div>'; });
+			$('#rec_list').html(html);
+		}
+		function renderSettings(d, s) {
+			$('#s_en span').removeClass('on').filter('[data-v=' + (d.enabled === '1' ? '1' : '0') + ']').addClass('on');
+			$('#s_force span').removeClass('on').filter('[data-v=' + (d.force_dns === '1' ? '1' : '0') + ']').addClass('on');
+			var rules = 0; (d.filters || []).forEach(function (f) { if (f.enabled) rules += f.rules; });
+			$('#i_ver').text(d.version || '—'); $('#i_rules').text(s.run ? fmtN(rules) : '—'); $('#i_iv').text(s.run && d.filters_updated ? '每 ' + d.filters_updated + ' 小时' : '—');
+			if (!dirty) $('#ur_text').val(d.user_rules || '');
+			$('#ur_dirty').toggle(dirty);
+		}
+		function render(d) {
+			st = d; var s = derive(d);
+			if (d.status === 1) { $('#ag_chip').attr('class', 'cx-chip bad').find('span').text('未安装'); return; }
+			renderHead(d, s); renderHero(d, s); renderAlert(d, s); renderDash(d, s); renderFilters(d, s); renderRec(d); renderSettings(d, s);
+		}
+		function refresh() { return ubus('web_get_adg').then(render); }
+
+		/* ---------- 事件 ---------- */
+		var EVICO = { dns_on: '🟢', dns_off: '⚪', engine_start: '🚀', engine_fail: '🔴', info: '·' };
+		var EVTOAST = { dns_on: 1, dns_off: 1, engine_fail: 1 };
+		function renderEvents(list) {
+			list = list || [];
+			var top = list.length ? list[list.length - 1].t : 0;
+			if (evInit && top > lastEv) list.forEach(function (e) { if (e.t > lastEv && EVTOAST[e.k]) toast(e.m, e.k === 'dns_on'); });
+			if (top > lastEv) { if (evInit) refresh(); lastEv = top; }
+			evInit = true;
+			if (!list.length) { $('#ev_list').html('<div style="color:var(--mute)">暂无事件</div>'); return; }
+			var html = '';
+			list.slice(-8).reverse().forEach(function (e) { html += '<div><span class="t">' + hhmmss(new Date(e.t * 1000)) + '</span><span>' + (EVICO[e.k] || '·') + ' ' + esc(e.m) + '</span></div>'; });
+			$('#ev_list').html(html);
+		}
+
+		/* ---------- 查询记录 ---------- */
+		function renderLog(rows) {
+			$('#q_sum').text(rows.length + ' 条');
+			if (!rows.length) { $('#q_body').html('<tr><td colspan="6" style="text-align:center;padding:46px 0;color:var(--mute)">' + (st && st.core === 'running' ? '暂时没有记录。设备上网后，域名查询会出现在这里。' : '广告过滤引擎未运行') + '</td></tr>'); return; }
+			var html = '';
+			rows.forEach(function (r) {
+				var t = new Date(r.time), tag = r.blocked ? '<span class="ag-tag b">已拦截</span>' : r.allowed ? '<span class="ag-tag a">已放行</span>' : '<span class="ag-tag">正常</span>';
+				html += '<tr><td style="white-space:nowrap">' + (isNaN(t) ? '' : hhmmss(t)) + '</td><td><div class="h" title="' + esc(r.domain) + '">' + esc(r.domain) + '</div><div class="g">' + esc(r.type) + '</div></td><td>' + esc(r.name || r.client) + (r.name ? '<div class="g">' + esc(r.client) + '</div>' : '') + '</td><td>' + tag + '</td><td class="e" title="' + esc(r.rule) + '">' + esc(r.rule) + '</td><td>' + (r.blocked ? '<span class="x" style="color:var(--pri);cursor:pointer" data-allow="' + esc(r.domain) + '">放行</span>' : '<span class="x" style="color:var(--mute);cursor:pointer" data-block="' + esc(r.domain) + '">拦截</span>') + '</td></tr>';
+			});
+			$('#q_body').html(html);
+		}
+		function loadLog() {
+			if (!st || st.core !== 'running') { renderLog([]); return $.Deferred().resolve(); }
+			return ubus('web_adg_querylog', { search: $.trim($('#q_text').val()), only_blocked: String($('#q_mode .on').data('v')), limit: '100' }).then(function (r) { renderLog(r.rows || []); });
+		}
+
+		/* ---------- 交互 ---------- */
+		function goTab(t) { $('.cx-tab').removeClass('on').filter('[data-t=' + t + ']').addClass('on'); $('.cx-pane').removeClass('on'); $('#p_' + t).addClass('on'); curTab = t; try { sessionStorage.setItem('ag_tab', t); } catch (e) {} pollNow(); }
+		$('#ag_tabs').on('click', '.cx-tab', function () { goTab($(this).data('t')); });
+		function act(a) {
+			if (a === 'start') setAdg({ enabled: '1' }, '正在开启广告过滤');
+			else if (a === 'stop') setAdg({ enabled: '0' }, '广告过滤已关闭');
+			else if (a === 'restart') setAdg({ enabled: '1', restart: '1' }, '正在重新启动');
+			else if (a === 'resume') setAdg({ protection: '1' }, '已恢复过滤');
+		}
+		$('#hero_btn').on('click', function () { act($(this).data('act')); });
+		$('#hero_pause').on('click', function () { if (confirm('暂停后所有网站都不会被拦截，直到你点「恢复过滤」。确定吗？')) setAdg({ protection: '0' }, '已暂停过滤'); });
+		$('#s_en').on('click', 'span', function () { var v = String($(this).data('v')); if (v === '0' && !confirm('关闭后广告过滤引擎会停止，所有设备的解析回到路由器原来的方式。确定吗？')) return; setAdg({ enabled: v }, v === '1' ? '正在开启广告过滤' : '广告过滤已关闭'); });
+		$('#s_force').on('click', 'span', function () { setAdg({ force_dns: String($(this).data('v')) }, '已保存，约 10 秒后生效'); });	/* 转发规则由守护进程下一轮才换上，不是立刻 */
+
+		/* 放行 / 拦截（自动增删自定义规则） */
+		/* 引擎重新编译规则需要几秒到半分钟：保存成功后轮询「实测」直到真的生效，别让用户以为已经好了 */
+		function waitEffect(domain, mode) {
+			var n = 0;
+			(function poll() {
+				ubus('web_adg_check', { domain: domain }).then(function (r) {
+					var ok = mode === 'allow' ? !r.blocked : mode === 'block' ? !!r.blocked : true;
+					if (ok) { toast('已生效：' + domain, true); if (curTab === 'log') loadLog(); }
+					else if (++n < 25) setTimeout(poll, 2500);
+					else toast('设置已保存，但生效比预期慢，请稍后再试', false);
+				}, function () { });
+			})();
+		}
+		function allow(domain, mode, msg) {
+			ubus('web_adg_allow', { domain: domain, mode: mode }).then(function (r) {
+				if (r.status !== 0) { toast(MSG[r.status] || '操作失败'); return; }
+				toast(msg + '，正在生效（约 10 秒）…', true); dirty = false; refresh();
+				if (mode !== 'reset') waitEffect(domain, mode);
+			}, function () { toast('操作失败'); });
+		}
+		$('body').on('click', '[data-allow]', function () { var d = String($(this).data('allow')); if (confirm('放行「' + d + '」？之后访问它（含子域名）不会再被拦截。')) allow(d, 'allow', '已放行 ' + d); });
+		$('body').on('click', '[data-block]', function () { var d = String($(this).data('block')); if (confirm('拦截「' + d + '」？之后它（含子域名）会被拦截。')) allow(d, 'block', '已拦截 ' + d); });
+
+		/* 订阅管理 */
+		/* 添加/启停/更新 由后端在后台做（下载解析规则要几十秒）：弹出原厂样式的等待框，轮询到做完为止 */
+		var FJOB = { add: '正在下载并解析这份规则，最长约 1 分钟…', toggle: '正在应用，请稍候…', refresh: '正在更新全部规则列表，最长约 2 分钟…', remove: '正在删除…' };
+		function filterJob(args) {
+			var rel = KelUI.hold(FJOB[args.op]), out = $.Deferred(), t0 = Date.now();
+			function done(r) { rel(); filtSig = ''; refresh(); out.resolve(r); }
+			function poll() {
+				ubus('web_get_adg').then(function (d) {
+					var f = String(d.fjob || '').split('|');
+					if (f[0] === 'running' && Date.now() - t0 < 150000) { setTimeout(poll, 2000); return; }
+					done(f[0] === 'ok' ? { status: 0 } : { status: 4, error: f.slice(2).join('|') });
+				}, function () { if (Date.now() - t0 < 150000) setTimeout(poll, 3000); else done({ status: 4 }); });
+			}
+			ubus('web_adg_filter', args).then(function (r) { if (r.status === 0 && r.pending) { r0 = r; setTimeout(poll, 1500); } else done(r); }, function () { done({ status: -1 }); });
+			var r0 = null;
+			return out.promise().then(function (r) { if (r0 && r.status === 0) r.enabled = r0.enabled; return r; });
+		}
+		function addFilter(name, url) {
+			$('#flt_res').text('');
+			return filterJob({ op: 'add', url: url, name: name }).then(function (r) {
+				if (r.status === 0) { toast('配置成功', true); $('#flt_url, #flt_name').val(''); }
+				else $('#flt_res').css('color', 'var(--bad)').text('✗ ' + (r.status === 5 ? MSG[5] : r.status === 2 ? '链接格式不对' : r.status === 6 ? '上一个操作还没做完，请稍后再试' : '添加失败：链接打不开，或里面不是过滤规则' + (r.error ? '（' + r.error.slice(0, 80) + '）' : '')));
+			});
+		}
+		$('#rec_list').on('click', '[data-rec]', function () { var r = REC[+$(this).data('rec')]; addFilter(r.name, r.url); });
+		$('#flt_add').on('click', function () { var u = $.trim($('#flt_url').val()); if (!u) { toast('请先粘贴订阅链接'); return; } addFilter($.trim($('#flt_name').val()), u); });
+		$('#flt_list').on('click', '[data-toggle]', function () {
+			filterJob({ op: 'toggle', url: String($(this).closest('[data-url]').data('url')) }).then(function (r) { toast(r.status === 0 ? (r.enabled ? '已启用' : '已停用') : '配置失败，请重新配置', r.status === 0); });
+		});
+		$('#flt_list').on('click', '[data-del]', function () {
+			var url = String($(this).closest('[data-url]').data('url'));
+			if (!confirm('删除这份订阅？它的规则会全部失效。')) return;
+			filterJob({ op: 'remove', url: url }).then(function (r) { toast(r.status === 0 ? '已删除' : '删除失败', r.status === 0); });
+		});
+		$('#flt_refresh').on('click', function () {
+			filterJob({ op: 'refresh' }).then(function (r) { toast(r.status === 0 ? '规则已是最新' : '更新失败，请稍后重试', r.status === 0); });
+		});
+
+		/* 自定义规则（草稿保护：以「有没有改动」而不是「有没有焦点」为准） */
+		$('#ur_text').on('input', function () { dirty = true; $('#ur_dirty').show(); });
+		$('#ur_save').on('click', function () {
+			ubus('web_adg_rules', { rules_text: $('#ur_text').val() }).then(function (r) {
+				toast(r.status === 0 ? '规则已保存，几秒到半分钟内生效' : r.status === 2 ? '有规则格式不对：' + (r.line || '') : (MSG[r.status] || '保存失败'), r.status === 0);
+				if (r.status === 0) { dirty = false; refresh(); }
+			}, function () { toast('保存失败'); });
+		});
+
+		/* 检查网站 */
+		function doCheck() {
+			var d = $.trim($('#ck_domain').val()).toLowerCase().replace(/^https?:\/\//, '').replace(/[\/?#].*$/, ''); if (!d) { toast('请先输入网站，例如 ads.example.com'); return; }
+			var box = $('#ck_res').show().css('color', 'var(--mute)').text('检查中…');
+			ubus('web_adg_check', { domain: d }).then(function (r) {
+				if (r.status !== 0) { box.text(r.status === 2 ? '网站格式不对' : '检查失败（引擎没有运行？）'); return; }
+				var h;
+				if (r.blocked) h = '🚫 <b>' + esc(r.domain) + '</b> 会被拦截。<br>命中规则：<code>' + esc(r.rule) + '</code>' + (r.list ? '（来自订阅「' + esc(r.list) + '」）' : '（来自你的自定义规则）') + '<br><span class="cx-btn sm" data-allow="' + esc(r.domain) + '" style="margin-top:8px">放行它</span>';
+				else if (r.allowed) h = '✅ <b>' + esc(r.domain) + '</b> 已被放行。<br>命中规则：<code>' + esc(r.rule) + '</code><br><span class="cx-btn sm" data-block="' + esc(r.domain) + '" style="margin-top:8px">改为拦截</span>';
+				else h = '✅ <b>' + esc(r.domain) + '</b> 不会被拦截（没有规则命中它）。<br><span class="cx-btn sm" data-block="' + esc(r.domain) + '" style="margin-top:8px">拦截它</span>';
+				box.css('color', 'var(--txt)').html(h);
+			}, function () { box.text('检查失败'); });
+		}
+		$('#ck_go').on('click', doCheck); $('#ck_domain').on('keydown', function (e) { if (e.which === 13) doCheck(); });
+
+		/* 查询记录筛选 */
+		$('#q_text').on('input', function () { clearTimeout(this._t); this._t = setTimeout(loadLog, 350); });
+		$('#q_mode').on('click', 'span', function () { $('#q_mode span').removeClass('on'); $(this).addClass('on'); loadLog(); });
+
+		/* 一键自检 */
+		var DGICO = { ok: '✅', warn: '🟡', bad: '🔴', off: '⚪' }, DGFIX = { start: '开启', goRules: '去添加规则', refresh: '立即更新规则' };
+		$('#ag_diag').on('click', function () {
+			$('#dg_sum').text('正在检查…'); $('#dg_list').empty(); $('#cx_mask, #cx_dg').show(); KelUI.place('#cx_dg');
+			ubus('web_adg_diagnose', { client_mac: myMac }).then(function (r) {
+				$('#dg_sum').text(r.summary === 'ok' ? '一切正常 👍' : r.summary === 'warn' ? '基本正常，有需要注意的地方' : '发现问题，按下面的建议处理');
+				var html = '';
+				(r.items || []).forEach(function (it) { html += '<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px dashed #eceef3"><span>' + (DGICO[it.state] || '') + '</span><div style="flex:1"><b>' + esc(it.title) + '</b><div class="cx-help" style="margin:2px 0 0">' + esc(it.msg) + '</div></div>' + (DGFIX[it.fix] ? '<span class="cx-btn sm" data-fix="' + it.fix + '">' + DGFIX[it.fix] + '</span>' : '') + '</div>'; });
+				$('#dg_list').html(html);
+			}, function () { $('#dg_sum').text('自检失败，请稍后重试'); });
+		});
+		$('#dg_list').on('click', '[data-fix]', function () { var f = $(this).data('fix'); $('#cx_mask, #cx_dg').hide(); if (f === 'start') act('start'); else if (f === 'goRules') goTab('rules'); else if (f === 'refresh') { goTab('rules'); $('#flt_refresh').click(); } });
+		$('#dg_close, #cx_mask').on('click', function () { $('#cx_mask, #cx_dg').hide(); });
+
+		/* 按页签轮询：只在可见、引擎运行、上一次请求已返回时才请求 */
+		function pollNow() {
+			if (document.hidden || !st) return;
+			if (curTab === 'overview') once('ev', function () { return ubus('web_adg_events').then(function (r) { renderEvents(r.events); }); });
+			else if (curTab === 'log') once('log', loadLog);
+		}
+		setInterval(pollNow, 4000);
+		$(window).on('resize', function () { if (st && st.stats) drawChart(st.stats.hourly || [], st.stats.hourly_blocked || []); });
+
+		$.ajax({ url: '/cgi-bin/get_clientmac.cgi', type: 'POST', dataType: 'text' }).done(function (t) { myMac = $.trim(t || ''); });
+		refresh().then(function () { var t = null; try { t = sessionStorage.getItem('ag_tab'); } catch (e) {} if (t && $('#p_' + t).length) goTab(t); else pollNow(); });
+		setInterval(function () { if (!document.hidden) refresh(); }, 5000);
+	});
+	</script>
+</body>
+</html>

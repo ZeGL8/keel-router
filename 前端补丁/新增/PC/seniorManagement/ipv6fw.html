@@ -1,0 +1,163 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+	<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="cache-control" content="no-cache"><meta http-equiv="expires" content="0">
+	<title>IPv6防火墙</title><link href="../../P_IMG/icon.png" rel="icon" type="image/x-icon" />
+	<link rel="stylesheet" href="../../bootstrap/css/bootstrap.min.css">
+	<link rel="stylesheet" href="../css/seniorManagement_common.css?v=20260928a">
+	<script src="../../Public_JS/jquery.min.js"></script><script src="../../Public_JS/jquery.cookie.js"></script>
+	<script src="../../Public_JS/iframe_height.js"></script><script src="../../Public_JS/kel-ui.js?v=20261024a"></script>
+	<style>
+		.fw_intro { color: #8a90a2; font-size: 14px; line-height: 22px; margin: 10px 0 18px; max-width: 860px; }
+		.fw_card { display: flex; justify-content: space-between; align-items: center; border: 1px solid #eee; border-radius: 12px; padding: 16px 20px; margin: 0 0 18px; }
+		.fw_switch { width: 52px; cursor: pointer; } .fw_allrow { margin: 4px 0 12px; color: #555; } .fw_allrow input { margin-right: 6px; }
+		.fw_warn { color: #e08a00; background: #fff6e5; border-radius: 8px; padding: 10px 14px; margin: 0 0 18px; font-size: 13px; display: none; }
+		.fw_wrapper .AF_table th:nth-child(1), .fw_wrapper .AF_table td:nth-child(1) { width: 22%; }
+		.fw_wrapper .AF_table th:nth-child(3), .fw_wrapper .AF_table td:nth-child(3) { width: 30%; }
+		.fw_wrapper .AF_table td { word-break: break-all; }
+		.fw_mute { color: #999; font-size: 12px; } .fw_ok { color: #22b573; } .fw_bad { color: #e08a00; }
+		.fw_link { color: #4762FE; cursor: pointer; margin-right: 14px; } .fw_link.del { color: #f04a45; }
+		.fw_copy { color: #4762FE; cursor: pointer; margin-left: 6px; font-size: 12px; }
+		.fw_row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+		.fw_row select, .fw_row input, #fw_dev { height: 40px; border: 1px solid #ccc; border-radius: 4px; padding: 0 10px; color: #555; background: #fff; }
+		.fw_row select { width: 90px; } .fw_row input { width: 150px; } #fw_dev { width: 100%; }
+		.fw_label { color: #999; margin: 6px 0 8px; } .fw_state { color: #999; font-size: 12px; line-height: 18px; margin-top: 8px; min-height: 18px; }
+		.proDialog { overflow-y: auto; } .proDialog .proDialog_foot { position: sticky; bottom: 0; background: #fff; padding: 12px 0 0; }
+	</style>
+</head><body>
+	<div class="seniorManagement_Box fw_wrapper">
+		<div class="seniorManagement_top">IPv6 防火墙</div>
+		<p class="fw_intro">IPv6 下家里每台设备都有自己的公网地址。外网默认不能访问它们；这里列出的是你允许外网访问的设备端口（例如 NAS、远程桌面）。IPv4 请用「端口转发」。</p>
+		<div class="fw_card"><div><b>IPv6 防火墙</b><span id="fw_sw_t" class="fw_mute" style="margin-left:10px"></span><div class="fw_mute" id="fw_sw_d" style="margin-top:4px"></div></div><img id="fw_sw" class="fw_switch" src="../../P_IMG/turn-on.png" alt="IPv6 防火墙开关"></div>
+		<div class="fw_warn" id="fw_router"></div>
+		<div class="seniorManagement_content_table"><table class="AF_table">
+			<thead><tr><th>设备</th><th>协议与端口</th><th>外网访问地址</th><th>状态</th><th>操作</th></tr></thead>
+			<tbody id="fw_body"><tr><td colspan="5" class="fw_mute">正在读取…</td></tr></tbody>
+		</table></div>
+		<div class="portForward_foot"><button type="button" id="seniorManagement_btn">添加放行</button></div>
+		<div class="shade"></div>
+		<div class="proDialog" id="fw_dlg">
+			<div class="proDialog_top"><span id="fw_title">添加放行</span><img src="../../P_IMG/off.png" class="off" id="fw_close"></div>
+			<div class="proDialog_content">
+				<div class="fw_label">设备</div><select id="fw_dev"></select>
+				<div class="fw_label" style="margin-top:16px">允许外网访问的端口</div>
+				<label class="fw_allrow"><input type="checkbox" id="fw_all">放行这台设备的全部端口</label>
+				<div id="fw_portbox"><div id="fw_ports"></div><button type="button" class="btn btn-default" id="fw_add">添加端口</button></div>
+				<div class="fw_state" id="fw_state"></div>
+			</div>
+			<div class="proDialog_foot"><button type="button" id="proDialog_btn">保存</button></div>
+		</div>
+	</div>
+<script>
+(function ($) {
+	var sid = $.cookie('sessionid'), devs = [], items = {}, off = [], editing = null, fwOpen = false;
+	function ubus(m, a) {
+		return $.ajax({ url: '/ubus', type: 'POST', dataType: 'json', contentType: 'application/json', timeout: 40000,
+			data: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'call', params: [sid, 'kelapi.static', m, a || {}] })
+		}).then(function (r) {
+			if (r.error && r.error.code === -32002) { top.location.href = 'http://' + location.host + '/index.html'; return $.Deferred().reject(); }
+			return (r.result && r.result[0] === 0) ? (r.result[1] || {}) : $.Deferred().reject();
+		});
+	}
+	function toast(msg, ok) { if (window.parent && window.parent.hintShaed) window.parent.hintShaed(msg, ok ? 'icon-duigouxuanzhong' : 'icon-gantanhao-yuankuang'); }
+	function esc(s) { return $('<div>').text(s == null ? '' : s).html(); }
+	function key(list) { return (list || []).map(function (x) { return x.proto + ':' + (+x.port); }).sort().join(','); }
+	function text(list) { return (list || []).map(function (x) { return x.proto === 'all' ? '全部端口' : x.proto.toUpperCase() + ' ' + x.port; }).join('、'); }
+	function isAll(list) { return (list || []).some(function (x) { return x.proto === 'all'; }); }
+	function name(d) { return d.name || d.id; }
+	/* 这台设备能不能放行：不能时返回原因 */
+	function why(d) {
+		if (off.indexOf(d.id) >= 0) return 'IPv6 上网已关闭（在设备列表里打开）';
+		if (!(items[d.id] || {}).method) return d.online === '1' ? '只有临时地址，换前缀后会失效' : '离线，无法确认地址';
+		return '';
+	}
+	function height() { try { if (parent.setHeight) parent.setHeight(document.documentElement.scrollHeight, 500); } catch (e) {} }
+	function render() {
+		var rows = devs.filter(function (d) { return (d.inbound || []).length; }), html = '';
+		rows.forEach(function (d) {
+			var it = items[d.id] || {}, st = off.indexOf(d.id) >= 0 ? '<span class="fw_bad">未生效：这台设备的 IPv6 上网已关闭</span>'
+				: it.address ? '<span class="fw_ok">已生效</span>' : '<span class="fw_bad">设备当前没有在用这个地址（可能离线）</span>';
+			html += '<tr><td>' + esc(name(d)) + '<div class="fw_mute">' + esc(d.id) + '</div></td><td>' + esc(text(d.inbound)) + '</td><td>'
+				+ (it.address ? esc(it.address) + '<span class="fw_copy" data-a="' + esc(it.address) + '">复制</span>' : '<span class="fw_mute">—</span>')
+				+ '</td><td>' + st + '</td><td><span class="fw_link" data-edit="' + esc(d.id) + '">编辑</span><span class="fw_link del" data-del="' + esc(d.id) + '">删除</span></td></tr>';
+		});
+		$('#fw_body').html(html || '<tr><td colspan="5" class="fw_mute" style="height:110px">还没有放行任何端口。外网目前访问不到家里的任何设备。</td></tr>');
+		height();
+	}
+	function load() {
+		return $.when(ubus('web_get_device_list', { stats: '0' }), ubus('web_get_inbound_overview')).then(function (a, b) {
+			devs = a.device_list || []; items = b.items || {}; off = b.ipv6_off || [];
+			fwOpen = !!b.fw_open;
+			$('#fw_sw').attr('src', '../../P_IMG/' + (fwOpen ? 'turn-off' : 'turn-on') + '.png');
+			$('#fw_sw_t').text(fwOpen ? '已关闭' : '已开启（推荐）');
+			$('#fw_sw_d').text(fwOpen ? '外网可以主动访问家里所有设备的所有端口。路由器本身仍受保护。' : '外网不能主动访问家里的设备，只有下面列出的例外。路由器本身始终受保护。');
+			$('#fw_router').toggle(fwOpen).text('注意：IPv6 防火墙已关闭，下面的放行清单此时不起限制作用——所有设备都对外网开放。');
+			render();
+		}, function () { $('#fw_body').html('<tr><td colspan="5" class="fw_bad">读取失败，请刷新重试</td></tr>'); });
+	}
+	function portRow(p) { return '<div class="fw_row"><select class="fw_proto"><option value="tcp"' + (p.proto === 'udp' ? '' : ' selected') + '>TCP</option><option value="udp"' + (p.proto === 'udp' ? ' selected' : '') + '>UDP</option></select><input class="fw_port" type="number" min="1" max="65535" placeholder="端口" value="' + esc(p.port || '') + '"><span class="fw_link del fw_rm">删除</span></div>'; }
+	function stateOf(mac) {
+		var d = devs.find(function (x) { return x.id === mac; }), it = items[mac] || {};
+		if (!d) return '';
+		var w = why(d); if (w) return '这台设备不能放行：' + w + '。';
+		return '外网将通过 ' + (it.address || '（当前前缀）' + it.suffix) + ' 访问这台设备。这会把端口暴露到公网，请确认设备上的服务有密码保护。';
+	}
+	function openDlg(mac) {
+		var opts = devs.filter(function (d) { return d.online === '1' || (d.inbound || []).length; }).map(function (d) {
+			var w = why(d), has = (d.inbound || []).length && mac !== d.id;
+			return '<option value="' + esc(d.id) + '"' + (w || has ? ' disabled' : '') + '>' + esc(name(d)) + '（' + esc(d.ip || d.id) + '）' + (w ? ' — ' + esc(w) : has ? ' — 已有放行，请点它的「编辑」' : '') + '</option>';
+		});
+		$('#fw_dev').html('<option value="">请选择设备</option>' + opts.join('')).prop('disabled', !!mac).val(mac || '');
+		editing = mac || null; $('#fw_title').text(mac ? '编辑放行' : '添加放行');
+		var d = devs.find(function (x) { return x.id === mac; });
+		var all = !!(d && isAll(d.inbound));
+		$('#fw_ports').html(((d && d.inbound && d.inbound.length && !all) ? d.inbound : [{ proto: 'tcp', port: '' }]).map(portRow).join(''));
+		$('#fw_all').prop('checked', all); $('#fw_portbox').toggle(!all);
+		$('#fw_state').text(mac ? stateOf(mac) : '');
+		$('.shade, #fw_dlg').show(); KelUI.place('#fw_dlg');
+	}
+	function closeDlg() { $('.shade, #fw_dlg').hide(); editing = null; }
+	function readPorts() {
+		var out = [], bad = false;
+		$('#fw_ports .fw_row').each(function () { var p = $.trim($(this).find('.fw_port').val()); if (p === '') return; if (!/^\d+$/.test(p) || +p < 1 || +p > 65535) bad = true; out.push({ proto: $(this).find('.fw_proto').val(), port: p }); });
+		return bad ? null : out;
+	}
+	/* 保存后以读回的设置为准；空清单 = 取消这台设备的全部放行 */
+	function commit(mac, ports, msgOk) {
+		var want = key(ports), rel = KelUI.hold('正在保存…');
+		return ubus('web_set_device_inbound', { uid: mac, ports: isAll(ports) ? 'all' : want }).then(function (r) {
+			if (r.status !== 0) { rel(); toast({ 1: '端口填写有误', 2: '已保存，但防火墙规则没有装上，请稍后再试', 3: '这台设备没有固定的地址，不能放行', 4: '这台设备的 IPv6 上网已关闭', 5: '防火墙配置检查没通过，已恢复原样' }[r.status] || '保存失败'); return false; }
+			return load().then(function () {
+				rel(); var d = devs.find(function (x) { return x.id === mac; }), ok = d && key(d.inbound) === want;
+				toast(ok ? msgOk : '已提交，但读回结果不一致，请刷新查看', ok); return ok;
+			});
+		}, function () { rel(); toast('连接中断，保存结果未确认，请刷新查看'); return false; });
+	}
+	$('#seniorManagement_btn').on('click', function () { openDlg(null); });
+	$('#fw_close').on('click', closeDlg);
+	$('#fw_dev').on('change', function () { $('#fw_state').text(stateOf(this.value)); });
+	$('#fw_add').on('click', function () { $('#fw_ports').append(portRow({ proto: 'tcp', port: '' })); });
+	$('#fw_ports').on('click', '.fw_rm', function () { $(this).closest('.fw_row').remove(); });
+	$('#fw_all').on('change', function () { $('#fw_portbox').toggle(!this.checked); });
+	/* 总开关：关掉要二次确认；以路由器回报的实际状态为准 */
+	$('#fw_sw').on('click', function () {
+		var open = !fwOpen;
+		if (open && !confirm('关闭 IPv6 防火墙后，外网可以主动访问家里所有设备的所有端口（电脑的共享文件、摄像头、NAS 管理页等）。\n只想开放某台设备，请用下面的「添加放行」。\n\n仍然关闭吗？')) return;
+		var rel = KelUI.hold('正在保存…');
+		ubus('web_set_ipv6_fw', { open: open ? '1' : '0' }).then(function (r) { return load().then(function () { rel(); toast(r.status === 0 ? (open ? 'IPv6 防火墙已关闭' : 'IPv6 防火墙已开启') : '规则没有生效，请稍后再试', r.status === 0); }); }, function () { rel(); toast('保存失败'); });
+	});
+	$('#proDialog_btn').on('click', function () {
+		var mac = editing || $('#fw_dev').val(), ports = $('#fw_all').prop('checked') ? [{ proto: 'all', port: '' }] : readPorts();
+		if (!mac) { toast('请选择设备'); return; }
+		if (ports === null) { toast('端口请输入 1–65535 之间的整数'); return; }
+		var d = devs.find(function (x) { return x.id === mac; }), before = (d && d.inbound) || [];
+		if (!ports.length && !before.length) { toast('请至少填写一个端口'); return; }
+		var added = ports.filter(function (p) { return key(before).split(',').indexOf(p.proto + ':' + (+p.port)) < 0; });
+		if (added.length && !confirm(isAll(ports) ? '将允许外网经 IPv6 访问「' + name(d) + '」的全部端口——相当于只对这台设备关掉防火墙。\n它上面所有对外的服务（共享文件、远程桌面、管理页面等）都会暴露到公网。\n\n确定吗？' : '将允许外网经 IPv6 访问「' + name(d) + '」的 ' + text(added) + '。\n这会把它暴露到公网，请确认设备上的服务有密码保护。\n\n确定吗？')) return;
+		commit(mac, ports, ports.length ? '已保存并生效' : '已取消这台设备的放行').then(function (ok) { if (ok) closeDlg(); });
+	});
+	$('#fw_body').on('click', '[data-edit]', function () { openDlg($(this).data('edit')); })
+		.on('click', '[data-del]', function () { var mac = $(this).data('del'), d = devs.find(function (x) { return x.id === mac; }); if (confirm('取消「' + name(d) + '」的全部外网放行？')) commit(mac, [], '已取消放行'); })
+		.on('click', '.fw_copy', function () { var t = $('<textarea>').val($(this).data('a')).appendTo('body').select(); try { document.execCommand('copy'); toast('已复制', true); } catch (e) {} t.remove(); });
+	load();
+})(window.jQuery);
+</script></body></html>
